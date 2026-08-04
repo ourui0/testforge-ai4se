@@ -127,6 +127,8 @@ After Task 3, Tasks 4, 6, 7, and 9 can run in parallel worktrees. Task 13 can ru
 
 ### Task 1: Package Skeleton and Validated Configuration
 
+> **Formal completion:** implementer `/root/task01_implementer`; task commit `f617cf7`; integration merge `313de8f`; RED observed before production code; focused/full suites `4 passed`; independent task review found no issues.
+
 **Files:**
 - Create: `pyproject.toml`
 - Create: `src/testforge/__init__.py`
@@ -138,7 +140,7 @@ After Task 3, Tasks 4, 6, 7, and 9 can run in parallel worktrees. Task 13 can ru
 - Consumes: none.
 - Produces: `TaskBudget`, `QualityThreshold`, and `ProjectConfig` Pydantic models used by all later tasks.
 
-- [ ] **Step 1: Add packaging metadata and write the failing default-budget test**
+- [x] **Step 1: Add packaging metadata and write the failing default-budget test**
 
 ```toml
 [build-system]
@@ -190,7 +192,7 @@ def test_project_config_has_spec_defaults(tmp_path):
     assert config.quality.coverage_target_percent == 90.0
 ```
 
-- [ ] **Step 2: Install into the project virtual environment and verify RED**
+- [x] **Step 2: Install into the project virtual environment and verify RED**
 
 Run with the `.venv` interpreter selected in **Execution Environment Bootstrap**: `python -m pip install -e ".[dev]"`
 
@@ -198,7 +200,7 @@ Run with that same interpreter: `python -m pytest tests/unit/test_config.py -v`
 
 Expected: FAIL because `testforge.config` does not exist.
 
-- [ ] **Step 3: Implement validated immutable configuration**
+- [x] **Step 3: Implement validated immutable configuration**
 
 ```python
 # src/testforge/config.py
@@ -234,7 +236,7 @@ class ProjectConfig(BaseModel):
     quality: QualityThreshold = QualityThreshold()
 ```
 
-- [ ] **Step 4: Add invalid-budget cases and run GREEN**
+- [x] **Step 4: Add invalid-budget cases and run GREEN**
 
 ```python
 import pytest
@@ -251,7 +253,7 @@ def test_budget_rejects_invalid_bounds(field, value):
 Run: `python -m pytest tests/unit/test_config.py -v`  
 Expected: PASS.
 
-- [ ] **Step 5: Add secret/build ignores and commit**
+- [x] **Step 5: Add secret/build ignores and commit**
 
 ```gitignore
 .env

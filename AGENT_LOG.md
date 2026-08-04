@@ -59,3 +59,14 @@
 - **批准范围**：Python 3.11、`.venv`、Git 初始化/身份、Hatch wheel 映射、`.pytest_tmp`，以及冷启动 Task 1 的完整证据。
 - **实现边界**：不复制或 cherry-pick `D:\AI4SE-2` 的试做提交；正式 Task 1 在批准后创建的隔离 worktree 中重新按 TDD 实施和评审。
 - **后续流程**：`using-git-worktrees` → `subagent-driven-development` → 每任务 spec/quality review → 最终全分支 review。
+
+## 2026-08-04 · TASK-001
+
+- **阶段/任务**：正式 Task 1，包骨架与验证配置。
+- **Superpowers 技能**：`using-git-worktrees`、`test-driven-development`、`subagent-driven-development`、`requesting-code-review`、`verification-before-completion`。
+- **隔离与 context**：分支 `task-01-package-config`；worktree `D:\AI4SE\.worktrees\task-01-package-config`；实现智能体 `/root/task01_implementer` 只读取 147 行 Task 1 简报；未读取冷启动代码。
+- **TDD**：RED 为 `ModuleNotFoundError: No module named 'testforge'`；实现后 focused 与 full suite 均为 4 passed。
+- **环境干预**：普通沙箱无法启动用户目录的 Python 3.11；主控制器只负责创建/授权项目 `.venv`，没有修改产品代码，原实现智能体随后完成 RED/GREEN。
+- **提交/合并**：实现提交 `f617cf7`（`build: add validated project configuration`）；本地 PR 等价分支经 `--no-ff` 合入集成分支，merge commit `313de8f`。远程尚未配置，真实 PR/MR 待平台确定后补充。
+- **评审**：只读评审智能体 `/root/task01_reviewer` 判定 Spec compliant、Task quality Approved；Critical/Important/Minor 均为 0。
+- **人工修改**：无产品代码人工修改；控制器仅更新 PLAN/AGENT_LOG/进度账本。
