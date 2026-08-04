@@ -20,5 +20,5 @@
 - **人工干预**：用户批准书面 SPEC 后触发本阶段；尚未批准 `PLAN.md`。
 - **自检修订**：发现原 SPEC 未说明禁网沙箱如何取得项目依赖，补充“可信仓库在 init 阶段构建本地多阶段项目镜像，运行阶段禁网，最终镜像不含源码且不自动推送”的边界。
 - **产出**：`PLAN.md`、`docs/superpowers/plans/2026-08-04-testforge-harness.md`，以及对应的 `SPEC.md` / `SPEC_PROCESS.md` 修订。
-- **subagent/commit**：计划编写阶段未派发 subagent；提交哈希在文档提交后记录。
+- **subagent/commit**：计划编写阶段未派发 subagent；计划与规约修订提交为 `cb30a65`。
 - **教训**：沙箱的运行时隔离与依赖供应必须同时设计；只规定“禁网运行”不足以让陌生项目可执行。
