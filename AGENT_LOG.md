@@ -108,3 +108,14 @@
 - **评审**：只读评审智能体 `/root/task03_reviewer` 的唯一 Important 为初始指标未进入不可变指标历史；原实现者 fix round 1 后，专项复审判定 ADDRESSED、无新 Critical/Important，最终批准。
 - **人工修改**：无产品代码人工修改；控制器仅固化用户批准的公开契约、准备环境、生成审查包并更新证据文档。
 - **PR 状态**：本地独立分支/worktree 已评审并合入；远程仍未配置，真实 PR/MR 待平台确定后补充。
+
+## 2026-08-04 · TASK-004
+
+- **阶段/任务**：正式 Task 4，确定性治理策略。
+- **契约暂停与人工决定**：实现智能体 `/root/task04_implementer` 在产品代码前指出未知动作没有模型/接口，且重构提案语义不明。用户批准：未知工具拒绝归 Task 11；Task 4 从 `ProjectConfig` 读取边界，只验证精确目标模块的重构资格，审批归 Task 5。修订提交为 `0349993`。
+- **TDD**：首次 RED 为缺少 `testforge.governance`；扩展路径、补丁、重构和预算测试产生 16 个预期失败。独立评审发现宿主机路径语法导致跨平台绕过，以及构造期未拒绝配置逃逸；原实现者补充 Windows/POSIX 双语法与配置符号链接回归测试后修复。
+- **提交/合并**：任务提交 `6a02027`、`2f811ac`；本地 PR 等价分支经 `--no-ff` 合入集成分支，merge commit `38d41c9`。
+- **验证**：最终治理专项 `35 passed, 2 skipped`，全套 `65 passed, 2 skipped`，Task 4 Ruff 检查通过。两个 skip 均为 Windows 拒绝创建真实符号链接，符合已批准测试约定；控制器合并前独立复跑一致。
+- **评审**：只读评审 `/root/task04_reviewer` 的 Important 与 Minor 均在 fix round 1 后判定 ADDRESSED，无新 Critical/Important，最终批准。
+- **人工修改**：无产品代码人工修改；控制器仅写入用户批准的 SPEC/PLAN 契约、准备隔离环境、生成审查包和更新证据。
+- **PR 状态**：本地独立分支/worktree 已评审并合入；远程仍未配置，真实 PR/MR 待平台确定后补充。

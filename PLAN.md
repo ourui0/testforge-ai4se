@@ -767,6 +767,8 @@ Commit: `git add src/testforge/persistence tests/unit/persistence && git commit 
 
 ### Task 4: Deterministic Governance Policy
 
+> **Formal completion:** implementer `/root/task04_implementer`; task commits `6a02027` and `2f811ac`; integration merge `38d41c9`; initial and review-fix RED evidence captured; governance suite `35 passed, 2 skipped`, full suite `65 passed, 2 skipped`; independent review approved after cross-platform path findings were fixed and re-reviewed as ADDRESSED.
+
 **Files:**
 - Create: `src/testforge/governance/__init__.py`
 - Create: `src/testforge/governance/policy.py`
@@ -789,7 +791,7 @@ class GovernancePolicy:
 
 All paths are repository-relative and canonicalized before comparison. Test proposals must remain inside `config.tests_root`. Refactor proposals must resolve to exactly `config.target_module`; this method validates eligibility only and never grants approval, which remains Task 5's responsibility. Test content and refactor patches must be non-empty and within both UTF-8 byte and `splitlines()` limits. Empty replacement of an existing file is a deletion attempt. Budget usage at or above any configured attempt, LLM-call, active-time, or mutant limit is rejected with `PolicyViolation`. Unknown tool/action rejection belongs to Task 11's discriminated request adapter and explicit dispatcher registry; Task 4 does not add a stringly typed `validate_action` API.
 
-- [ ] **Step 1: Write failing path-escape and source-write tests**
+- [x] **Step 1: Write failing path-escape and source-write tests**
 
 ```python
 def test_rejects_parent_directory_escape(policy):
@@ -803,12 +805,12 @@ def test_rejects_source_write_without_refactor_approval(policy):
         policy.validate_test_proposal(proposal)
 ```
 
-- [ ] **Step 2: Run policy tests to verify RED**
+- [x] **Step 2: Run policy tests to verify RED**
 
 Run: `python -m pytest tests/unit/governance/test_policy.py -v`  
 Expected: FAIL because `GovernancePolicy` does not exist.
 
-- [ ] **Step 3: Implement canonical-path and patch-limit checks**
+- [x] **Step 3: Implement canonical-path and patch-limit checks**
 
 ```python
 class GovernancePolicy:
@@ -834,7 +836,7 @@ class GovernancePolicy:
         return candidate
 ```
 
-- [ ] **Step 4: Add symlink, deletion, refactor-target, and exhausted-budget cases**
+- [x] **Step 4: Add symlink, deletion, refactor-target, and exhausted-budget cases**
 
 Create a real symlink fixture when supported; skip only when the OS denies test symlink creation. Assert resolved symlink escape is rejected. Assert empty replacement of an existing file, refactor proposals outside the exact configured target module, attempt 6, LLM call 7, active second 2701, and mutant 101 are rejected. Task 11 owns undeclared/unknown tool rejection through its discriminated request adapter and explicit registry.
 
@@ -865,7 +867,7 @@ def test_rejects_empty_replacement_of_existing_test(policy, existing_test):
 Run: `python -m pytest tests/unit/governance -v`  
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit: `git add src/testforge/governance tests/unit/governance && git commit -m "feat: enforce deterministic action policy"`
 
