@@ -8,5 +8,5 @@
 - **关键过程**：用户从候选列表中选择 TestForge；逐项确认 Python + pytest、单目标模块、纯单元测试、领域专用工具、结构化记忆、OpenAI + mock、钥匙串、Docker 沙箱、双审批、相对质量门槛、CLI + WebUI 和分发方案。
 - **人工干预**：用户逐项选择并逐节批准九个设计部分；最终明确回复“批准设计”。
 - **产出**：`SPEC.md`、`SPEC_PROCESS.md`、`docs/superpowers/specs/2026-08-04-testforge-harness-design.md`。
-- **subagent/commit**：设计阶段未派发 subagent；commit 在文档自检通过后记录。
+- **subagent/commit**：设计阶段未派发 subagent；设计文档提交为 `c106669`。
 - **教训**：测试生成项目必须以缺陷发现能力而非“测试能通过”为成功标准；公网演示与任意代码执行必须从架构上隔离。
