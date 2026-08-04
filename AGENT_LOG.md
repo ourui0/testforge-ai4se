@@ -31,3 +31,31 @@
 - **批准范围**：19 个 TDD 实现任务、依赖/并行关系、双阶段评审、冷启动硬门槛，以及可信仓库依赖镜像的新增安全边界。
 - **后续门槛**：使用与主开发 Codex 不同类型的全新智能体，仅提供 `SPEC.md` 与 `PLAN.md`，试做 1–2 个任务；完成记录与修订前禁止正式实现。
 - **subagent/commit**：未派发 Codex subagent，因为同类型代理不满足课程冷启动要求；审批证据提交为 `1e2bcca`。
+
+## 2026-08-04 · COLDSTART-001
+
+- **阶段/任务**：不同类型陌生智能体冷启动，Task 1 第一轮。
+- **智能体/隔离**：全新 Claude Code 会话，会话记录模型标识为 `deepseek-v4-pro`，与主开发 Codex 类型不同；独立目录 `D:\AI4SE-2`；仅提供 `SPEC.md` 与 `PLAN.md`。
+- **关键过程**：Claude Code 在写实现和执行 RED 前暂停，报告 Python 3.12 门槛与本机 3.11.0 冲突、目录未初始化 Git、未规定提交身份和 `.venv`，并询问 Windows 命令、路径与 `tmp_path` 语义。
+- **技术处理**：确认模式匹配从 3.10 起可用，计划所需 `StrEnum` 从 3.11 起可用；把项目最低版本修订为 3.11，发布容器继续使用 3.12。将 Git 初始化、仓库本地验证身份、`.venv` 解释器和跨平台路径约定写入 PLAN。
+- **产出差距**：本轮没有代码、RED/GREEN 或 commit，原因是陌生智能体按规约在不确定处停止；正式仓库没有接收冷启动代码。
+- **人工干预**：等待用户批准本轮 SPEC/PLAN 修订；批准后须让同一隔离会话继续 Task 1，并回传 RED/GREEN、diff、文件列表和 commit hash。
+- **Superpowers 技能**：`receiving-code-review`、`writing-plans`。
+
+## 2026-08-04 · COLDSTART-VERIFY-001
+
+- **阶段/任务**：Claude Code 在同一隔离会话复跑 Task 1，并由主 Codex 独立验证。
+- **RED 证据**：`.venv/Scripts/python.exe -m pytest tests/unit/test_config.py -v` 因 `ModuleNotFoundError: No module named 'testforge.config'` 产生 1 个收集错误。
+- **GREEN 证据**：Claude 得到 4 passed；主 Codex 使用隔离目录现有 Python 3.11.0/pytest 8.4.2 再次得到 `4 passed in 0.22s`。
+- **提交证据**：`6d225f80731d98b67c531c314e3e7e1b953aa946`；5 个 Task 1 文件，92 行新增；冷启动输入 SPEC/PLAN 未提交，冷启动代码未合入正式仓库。
+- **新计划缺口**：Hatch 无法从分发名推断 `src/testforge`，必须显式配置 wheel packages；Windows 用户级 pytest 临时目录产生可复现 `WinError 5`，必须使用忽略的项目内 `.pytest_tmp/`。
+- **文档修订**：已同步更新 `SPEC.md`、`PLAN.md`、`SPEC_PROCESS.md` 与 `PROJECT_ROADMAP.md`；等待用户明确批准后关闭冷启动门槛。
+- **Superpowers 技能**：`systematic-debugging`、`verification-before-completion`、`receiving-code-review`、`writing-plans`。
+
+## 2026-08-04 · COLDSTART-APPROVAL-001
+
+- **阶段/任务**：冷启动最终修订与正式实现授权。
+- **人工决定**：用户明确回复“批准最终冷启动修订并进入正式实现”。
+- **批准范围**：Python 3.11、`.venv`、Git 初始化/身份、Hatch wheel 映射、`.pytest_tmp`，以及冷启动 Task 1 的完整证据。
+- **实现边界**：不复制或 cherry-pick `D:\AI4SE-2` 的试做提交；正式 Task 1 在批准后创建的隔离 worktree 中重新按 TDD 实施和评审。
+- **后续流程**：`using-git-worktrees` → `subagent-driven-development` → 每任务 spec/quality review → 最终全分支 review。

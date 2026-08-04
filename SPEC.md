@@ -1,6 +1,6 @@
 # TestForge 设计规约
 
-> 状态：设计已批准，待书面审阅  
+> 状态：设计、计划与冷启动修订均已批准
 > 日期：2026-08-04  
 > 项目类型：AI4SE A 类 Coding Agent Harness
 
@@ -256,6 +256,9 @@ OpenAI 模型服务、Docker Engine、pytest、coverage.py、mutmut、操作系�
 ### 10.3 可用性与可靠性
 
 - CLI 错误必须给出可执行的修复提示；
+- TestForge 本身支持 Python 3.11 及以上版本；开发与测试必须在项目内 `.venv` 中运行，不能依赖调用者碰巧激活的全局解释器；
+- Windows 与 POSIX 的文档命令必须明确解释器选择方式。文档中的仓库相对路径和 `.gitignore` 统一使用 `/`，运行时路径运算统一使用 `pathlib.Path`；
+- pytest 临时文件固定写入项目内且已忽略的 `.pytest_tmp/`，避免受限 Windows 环境无法访问用户级临时目录；每次只顺序运行一个测试任务，不共享该目录；
 - 等待审批、进程重启或 WebUI刷新后任务可恢复；
 - 状态动作保持幂等，避免重复应用补丁；
 - 哈希不一致时拒绝继续，而不是猜测合并。
@@ -291,7 +294,7 @@ OpenAI 模型服务、Docker Engine、pytest、coverage.py、mutmut、操作系�
 
 ## 13. 技术选型与理由
 
-- Python 3.12+：与目标生态一致，便于调用 pytest 工具链；
+- Python 3.11+：`StrEnum` 等所需标准库能力从 3.11 起可用，并与冷启动开发环境一致；发布用 Docker 镜像固定使用 Python 3.12，但不把 3.12 设为本地开发硬门槛；
 - Typer：类型友好的 CLI；
 - FastAPI：复用 Pydantic 模型并提供本地/公网 Web API；
 - Pydantic：动作、配置和 LLM 结构化响应校验；

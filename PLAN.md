@@ -6,7 +6,7 @@
 
 **Architecture:** A modular monolith exposes one application service to a Typer CLI and FastAPI/HTMX UI. A persisted finite-state `AgentEngine` coordinates a provider-neutral LLM adapter, domain-only tools, deterministic feedback/quality gates, project memory, governance policies, and a Docker sandbox; the public demo swaps real execution and LLM access for fixtures and scripted mocks.
 
-**Tech Stack:** Python 3.12+, Pydantic, Typer, FastAPI, Jinja2/HTMX, SQLAlchemy + SQLite, keyring, OpenAI SDK, Docker SDK, pytest, coverage.py, mutmut, Ruff, mypy.
+**Tech Stack:** Python 3.11+ (Python 3.12 in release containers), Pydantic, Typer, FastAPI, Jinja2/HTMX, SQLAlchemy + SQLite, keyring, OpenAI SDK, Docker SDK, pytest, coverage.py, mutmut, Ruff, mypy.
 
 ## Global Constraints
 
@@ -25,6 +25,47 @@
 - Follow strict TDD for every task: observe RED, implement the minimum for GREEN, refactor under passing tests, run task tests, then run the full fast suite.
 - Every task receives spec-compliance review before code-quality review. Critical findings block the next task.
 - Never include a real credential in a test, fixture, command, log, commit, or screenshot.
+
+## Execution Environment Bootstrap
+
+Complete this once before Task 1. Python 3.11 is the minimum supported interpreter. Python pattern matching is not a 3.12-only feature; the plan's first version selected 3.12 without a project-specific need, so a 3.11 environment is valid.
+
+On Windows PowerShell:
+
+```powershell
+py -3.11 --version
+py -3.11 -m venv .venv
+$TestForgePython = (Resolve-Path ".venv\Scripts\python.exe").Path
+& $TestForgePython --version
+```
+
+On POSIX:
+
+```bash
+python3.11 --version
+python3.11 -m venv .venv
+TESTFORGE_PYTHON=".venv/bin/python"
+"$TESTFORGE_PYTHON" --version
+```
+
+Every later `python -m ...` command means the interpreter inside this `.venv`: use `& $TestForgePython -m ...` on Windows PowerShell or `"$TESTFORGE_PYTHON" -m ...` on POSIX. Do not silently fall back to a different global Python. A current Python 3.11 patch release is recommended for normal development, but Python 3.11.0 is sufficient for the cold-start Task 1 trial.
+
+Verify repository state before Task 1:
+
+```bash
+git rev-parse --is-inside-work-tree
+```
+
+If this fails because the disposable cold-start directory is not a repository, initialize only that directory with `git init -b main`. Preserve any existing Git identity. Check it with `git config --get user.name` and `git config --get user.email`. If either value is missing in the disposable cold-start repository, use repository-local validation identity only:
+
+```bash
+git config --local user.name "TestForge Cold Start"
+git config --local user.email "testforge-cold-start@example.invalid"
+```
+
+Do not modify global Git configuration. In the real project repository, a missing identity requires the human owner's identity instead of the validation identity.
+
+Repository paths in this plan use `/` intentionally: Git, `.gitignore`, Python imports, and documentation use portable forward slashes. Runtime filesystem code must use `pathlib.Path`. The cold-start trial reproduced `PermissionError: [WinError 5]` under the user-level pytest temp directory, so pytest intentionally uses the ignored project-local `.pytest_tmp/` as `--basetemp`. Test execution is sequential; concurrent runs must not share this directory.
 
 ## Planned File Structure
 
@@ -107,7 +148,7 @@ build-backend = "hatchling.build"
 [project]
 name = "testforge-harness"
 version = "0.1.0"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 dependencies = [
   "pydantic>=2.8,<3",
   "sqlalchemy>=2.0,<3",
@@ -125,9 +166,12 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["build>=1.2,<2", "httpx>=0.27,<1", "pytest>=8,<9", "pytest-cov>=5,<7", "pytest-json-report>=1.5,<2", "mutmut>=3,<4", "ruff>=0.6,<1", "mypy>=1.11,<2"]
 
+[tool.hatch.build.targets.wheel]
+packages = ["src/testforge"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+addopts = "-q --basetemp=.pytest_tmp"
 ```
 
 ```python
@@ -146,10 +190,12 @@ def test_project_config_has_spec_defaults(tmp_path):
     assert config.quality.coverage_target_percent == 90.0
 ```
 
-- [ ] **Step 2: Install the editable development package and verify RED**
+- [ ] **Step 2: Install into the project virtual environment and verify RED**
 
-Run: `python -m pip install -e ".[dev]"`  
-Run: `python -m pytest tests/unit/test_config.py -v`  
+Run with the `.venv` interpreter selected in **Execution Environment Bootstrap**: `python -m pip install -e ".[dev]"`
+
+Run with that same interpreter: `python -m pytest tests/unit/test_config.py -v`
+
 Expected: FAIL because `testforge.config` does not exist.
 
 - [ ] **Step 3: Implement validated immutable configuration**
@@ -212,6 +258,7 @@ Expected: PASS.
 .venv/
 __pycache__/
 .pytest_cache/
+.pytest_tmp/
 .coverage
 htmlcov/
 .mutmut-cache/
@@ -2012,7 +2059,7 @@ Add `testforge-demo = "testforge.demo:main"` and include templates/static assets
 
 - [ ] **Step 4: Add dual CI with an exact `unit-test` job**
 
-GitHub Actions runs Python 3.12 unit tests, fast mock integration tests, Ruff, mypy, wheel build, Docker build, and mechanism demo. `.gitlab-ci.yml` defines a job named exactly `unit-test` that runs `python -m pytest tests/unit tests/integration/test_mock_loop.py`, followed by package and container build jobs. Docker-dependent sandbox tests run only on a runner explicitly labeled/configured for Docker.
+GitHub Actions runs the unit and fast mock-integration suites on Python 3.11 and 3.12; Ruff, mypy, wheel build, Docker build, and mechanism demo may run once on Python 3.12. `.gitlab-ci.yml` defines a job named exactly `unit-test` on Python 3.12 that runs `python -m pytest tests/unit tests/integration/test_mock_loop.py`, followed by package and container build jobs. Docker-dependent sandbox tests run only on a runner explicitly labeled/configured for Docker.
 
 ```yaml
 # .gitlab-ci.yml
@@ -2091,7 +2138,7 @@ Implementation is forbidden immediately after this plan is written. Start a new 
 
 > Select Task 1 and at most one directly dependent task. Work autonomously from SPEC.md and PLAN.md only. If any requirement, interface, command, or expected result is uncertain, pause and ask instead of guessing.
 
-Record every pause, question, divergent interpretation, output difference, and resulting SPEC/PLAN revision in `SPEC_PROCESS.md`. Only after the revised documents receive human approval may implementation begin.
+Record every pause, question, divergent interpretation, output difference, and resulting SPEC/PLAN revision in `SPEC_PROCESS.md`. A correct pause before RED is valid cold-start evidence, but the gate is not complete until the documents are revised and approved, the same isolated agent resumes Task 1, and its RED/GREEN output, changed-file list, diff, and commit hash are recorded. Only then may formal implementation begin.
 
 ## Per-Task Review Gate
 
