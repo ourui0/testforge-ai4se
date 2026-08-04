@@ -885,7 +885,34 @@ Commit: `git add src/testforge/governance tests/unit/governance && git commit -m
 
 **Interfaces:**
 - Consumes: validated proposals from Task 4 and repository events from Task 3.
-- Produces: `sha256_text`, `ApprovalService.request`, `ApprovalService.decide`, and `AtomicPatchApplier.apply_file_replacement`.
+- Produces: `Clock`, `SystemClock`, `sha256_text`, `ApprovalService.request`, `decide`, `require_approved`, repository approval methods, and `AtomicPatchApplier.apply_file_replacement`.
+
+The public contract is:
+
+```python
+class Clock(Protocol):
+    def now(self) -> datetime: ...  # timezone-aware
+
+class ApprovalService:
+    def __init__(self, repository: SQLiteTaskRepository, clock: Clock | None = None) -> None: ...
+    def request(
+        self,
+        kind: Literal["refactor", "apply_tests"],
+        patch: str,
+        expires_at: datetime | None = None,
+    ) -> ApprovalRequest: ...
+    def decide(self, approval_id: UUID, approved: bool, patch_hash: str, actor: str) -> ApprovalRequest: ...
+    def require_approved(self, approval_id: UUID, patch: str) -> ApprovalRequest: ...
+
+class SQLiteTaskRepository:
+    def create_approval(self, request: ApprovalRequest) -> None: ...
+    def get_approval(self, approval_id: UUID) -> ApprovalRequest: ...
+    def update_approval(self, request: ApprovalRequest) -> None: ...
+```
+
+`SystemClock` returns UTC-aware time. Every service operation rejects a naive clock value with `InputError`; `request` stamps `created_at` from the injected clock and `decide` stamps `decided_at` from it, normalizing aware values to UTC. `request` defaults to no expiry; a supplied expiry must be timezone-aware and later than the current clock value. Missing or duplicate approval IDs raise `InputError`. Repository updates preserve immutable identity, kind, patch hash, and creation time. Only `PENDING` requests may be decided initially. Repeating the same decision with the same hash and actor returns the stored request without changing `decided_at`; a conflicting repeat raises `PolicyViolation`. Before `decide` or `require_approved`, an expired request is persisted as `EXPIRED` and rejected. `require_approved` validates approved status, expiry, and the SHA-256 of the current patch.
+
+`AtomicPatchApplier` is deliberately separate from approval checking; callers must invoke `require_approved` first. It accepts only a 64-character lowercase hexadecimal expected hash and a regular-file or nonexistent target. It rejects symlinks and directories, treats a missing file as empty content, reads UTF-8 with `newline=""` so newline bytes are not normalized, and never creates the parent directory. It writes a same-directory temporary file with `newline=""`, flushes and `fsync`s it, uses `os.replace`, and removes the temporary file after any failure.
 
 - [ ] **Step 1: Write the failing changed-patch approval test**
 
@@ -930,6 +957,8 @@ class ApprovalService:
 ```
 
 - [ ] **Step 4: Write RED/GREEN tests for stale-safe atomic write-back**
+
+Also cover injected-clock timestamps and expiry, naive-clock rejection, identical-decision idempotency, conflicting repeated decisions, missing/duplicate approval IDs, repository restart persistence, CRLF-sensitive hashing, invalid expected hashes, missing parents, directory/symlink rejection, successful replacement, and temporary-file cleanup on failure.
 
 ```python
 def test_apply_rejects_changed_destination(tmp_path, applier, approved_patch):
