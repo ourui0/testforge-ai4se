@@ -773,8 +773,21 @@ Commit: `git add src/testforge/persistence tests/unit/persistence && git commit 
 - Create: `tests/unit/governance/test_policy.py`
 
 **Interfaces:**
-- Consumes: `ProjectConfig`, `TaskBudget`, `TestProposal`, `RefactorProposal`, `PolicyViolation`.
+- Consumes: `ProjectConfig`, `TaskBudget`, `BudgetUsage`, `TestProposal`, `RefactorProposal`, `PolicyViolation`.
 - Produces: `GovernancePolicy.validate_read`, `validate_test_proposal`, `validate_refactor_proposal`, and `validate_budget`.
+
+The public contract is:
+
+```python
+class GovernancePolicy:
+    def __init__(self, config: ProjectConfig, max_patch_bytes: int = 65536, max_patch_lines: int = 600) -> None: ...
+    def validate_read(self, relative_path: str) -> Path: ...
+    def validate_test_proposal(self, proposal: TestProposal) -> Path: ...
+    def validate_refactor_proposal(self, proposal: RefactorProposal) -> Path: ...
+    def validate_budget(self, usage: BudgetUsage, budget: TaskBudget) -> None: ...
+```
+
+All paths are repository-relative and canonicalized before comparison. Test proposals must remain inside `config.tests_root`. Refactor proposals must resolve to exactly `config.target_module`; this method validates eligibility only and never grants approval, which remains Task 5's responsibility. Test content and refactor patches must be non-empty and within both UTF-8 byte and `splitlines()` limits. Empty replacement of an existing file is a deletion attempt. Budget usage at or above any configured attempt, LLM-call, active-time, or mutant limit is rejected with `PolicyViolation`. Unknown tool/action rejection belongs to Task 11's discriminated request adapter and explicit dispatcher registry; Task 4 does not add a stringly typed `validate_action` API.
 
 - [ ] **Step 1: Write failing path-escape and source-write tests**
 
@@ -799,9 +812,10 @@ Expected: FAIL because `GovernancePolicy` does not exist.
 
 ```python
 class GovernancePolicy:
-    def __init__(self, repository_root: Path, tests_root: Path, max_patch_bytes: int = 65536, max_patch_lines: int = 600):
-        self.repository_root = repository_root.resolve()
-        self.tests_root = tests_root
+    def __init__(self, config: ProjectConfig, max_patch_bytes: int = 65536, max_patch_lines: int = 600):
+        self.repository_root = config.repository_root.resolve()
+        self.tests_root = config.tests_root
+        self.target_module = config.target_module
         self.max_patch_bytes = max_patch_bytes
         self.max_patch_lines = max_patch_lines
 
@@ -820,9 +834,9 @@ class GovernancePolicy:
         return candidate
 ```
 
-- [ ] **Step 4: Add symlink, deletion, unknown-action, and exhausted-budget cases**
+- [ ] **Step 4: Add symlink, deletion, refactor-target, and exhausted-budget cases**
 
-Create a real symlink fixture when supported; skip only when the OS denies test symlink creation. Assert resolved symlink escape is rejected. Assert empty replacement of an existing file, undeclared action types, attempt 6, LLM call 7, and active second 2701 are rejected.
+Create a real symlink fixture when supported; skip only when the OS denies test symlink creation. Assert resolved symlink escape is rejected. Assert empty replacement of an existing file, refactor proposals outside the exact configured target module, attempt 6, LLM call 7, active second 2701, and mutant 101 are rejected. Task 11 owns undeclared/unknown tool rejection through its discriminated request adapter and explicit registry.
 
 ```python
 def test_rejects_symlink_escape(policy, tmp_path):
@@ -1456,6 +1470,8 @@ Commit: `git add src/testforge/sandbox docker tests/unit/sandbox tests/integrati
 **Interfaces:**
 - Consumes: `GovernancePolicy`, `DockerSandboxRunner`, parser functions, and proposal/result models.
 - Produces: `ToolName`, validated `ToolRequest` models, and `DomainToolDispatcher.dispatch(request) -> ToolResult`.
+
+**Ownership clarification:** this task exclusively owns undeclared/unknown tool and action rejection. Raw action payloads must pass the discriminated `ToolRequest` adapter and the explicit handler registry; no generic string action validator is added to `GovernancePolicy`.
 
 - [ ] **Step 1: Write failing unknown-tool and valid-pytest dispatch tests**
 
