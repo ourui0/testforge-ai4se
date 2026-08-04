@@ -875,6 +875,8 @@ Commit: `git add src/testforge/governance tests/unit/governance && git commit -m
 
 ### Task 5: Hash-Bound Approvals and Atomic Write-Back
 
+> **Formal completion:** implementer `/root/task05_implementer`; task commits `ca20865` and `384bc77`; integration merge `e2697b5`; lifecycle, filesystem, and review-fix RED evidence captured; Task 5 suite `46 passed, 1 skipped`, full suite `111 passed, 3 skipped`; independent review approved after three concurrency/time findings were fixed and re-reviewed as ADDRESSED.
+
 **Files:**
 - Create: `src/testforge/governance/approval.py`
 - Create: `src/testforge/governance/apply.py`
@@ -924,7 +926,7 @@ Repository approval writes reject naive datetimes and normalize every aware time
 
 `AtomicPatchApplier(repository_root)` uses a project-level cooperative OS lock that serializes TestForge writers across processes and is released automatically when the owning process exits. While holding it, the applier records the initial target identity/type/hash, writes and syncs the temporary file, then immediately before `os.replace` rechecks that the target is still the same object with the same exact hash (or is still absent). Any difference raises `StaleWorkspaceError`. CLI/WebUI must show a short "do not edit the target" state during this section. Portable filesystems provide no atomic content compare-and-swap against non-cooperating editors; an external write in the final check/replace micro-window is a documented residual race, not a claimed guarantee.
 
-- [ ] **Step 1: Write the failing changed-patch approval test**
+- [x] **Step 1: Write the failing changed-patch approval test**
 
 ```python
 def test_approval_is_valid_only_for_exact_patch(approval_service):
@@ -934,12 +936,12 @@ def test_approval_is_valid_only_for_exact_patch(approval_service):
         approval_service.require_approved(request.id, patch="changed")
 ```
 
-- [ ] **Step 2: Run approval test to verify RED**
+- [x] **Step 2: Run approval test to verify RED**
 
 Run: `python -m pytest tests/unit/governance/test_approval.py -v`  
 Expected: FAIL because approval support does not exist.
 
-- [ ] **Step 3: Implement hash-bound decisions**
+- [x] **Step 3: Implement hash-bound decisions**
 
 ```python
 def sha256_text(value: str) -> str:
@@ -966,7 +968,7 @@ class ApprovalService:
         return request
 ```
 
-- [ ] **Step 4: Write RED/GREEN tests for stale-safe atomic write-back**
+- [x] **Step 4: Write RED/GREEN tests for stale-safe atomic write-back**
 
 Also cover injected-clock timestamps and expiry, naive-clock rejection, identical-decision idempotency, conflicting concurrent decisions, missing/duplicate approval IDs, non-UTC and naive repository-boundary timestamps, repository restart persistence, CRLF-sensitive hashing, invalid expected hashes, missing parents, directory/symlink rejection, cooperative lock acquisition, an edit between temporary-file creation and the final recheck, successful replacement, and temporary-file cleanup on failure.
 
@@ -998,7 +1000,7 @@ class AtomicPatchApplier:
             temporary.unlink(missing_ok=True)
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit: `git add src/testforge/governance src/testforge/persistence tests/unit/governance && git commit -m "feat: bind approvals to atomic patches"`
 
