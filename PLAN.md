@@ -641,6 +641,8 @@ Commit: `git add src/testforge/domain tests/conftest.py tests/unit/domain && git
 
 ### Task 3: Transactional SQLite Repository
 
+> **Formal completion:** implementer `/root/task03_implementer`; task commits `c3ad066`, `af5e6ee`, and `50ccc40`; integration merge `2390774`; initial and review-fix RED evidence captured; persistence suite `18 passed`, full suite `30 passed`; independent review approved after one Important round-trip finding was fixed and re-reviewed as ADDRESSED.
+
 **Files:**
 - Create: `src/testforge/persistence/__init__.py`
 - Create: `src/testforge/persistence/schema.py`
@@ -668,7 +670,7 @@ def list_task_events(self, task_id: UUID) -> tuple[AuditEvent, ...]: ...
 
 `add_attempt` appends an immutable proposal snapshot. `add_metric` appends an immutable metric snapshot and atomically updates the matching `TaskRecord.baseline_metrics` or `TaskRecord.latest_metrics` field; any other `kind` is rejected. `add_audit_event` appends the supplied immutable event. Every write validates that the task exists and rolls back completely on failure. Event listing is deterministic by `occurred_at` and then insertion order.
 
-- [ ] **Step 1: Write the failing atomic-transition test**
+- [x] **Step 1: Write the failing atomic-transition test**
 
 ```python
 from testforge.domain.state_machine import TaskEvent, TaskState
@@ -683,12 +685,12 @@ def test_record_transition_updates_task_and_appends_event_atomically(tmp_path, s
     assert [event.reason for event in repo.list_task_events(sample_task.id)] == ["started"]
 ```
 
-- [ ] **Step 2: Run repository test to verify RED**
+- [x] **Step 2: Run repository test to verify RED**
 
 Run: `python -m pytest tests/unit/persistence/test_repository.py::test_record_transition_updates_task_and_appends_event_atomically -v`  
 Expected: FAIL because the repository does not exist.
 
-- [ ] **Step 3: Implement schema and repository transaction**
+- [x] **Step 3: Implement schema and repository transaction**
 
 ```python
 class SQLiteTaskRepository:
@@ -742,7 +744,7 @@ class AuditEventRow(Base):
     reason: Mapped[str] = mapped_column(String(512), nullable=False)
 ```
 
-- [ ] **Step 4: Add rollback and resume tests**
+- [x] **Step 4: Add rollback and resume tests**
 
 ```python
 def test_failed_event_insert_rolls_back_state(tmp_path, sample_task, monkeypatch):
@@ -757,7 +759,7 @@ def test_failed_event_insert_rolls_back_state(tmp_path, sample_task, monkeypatch
 Run: `python -m pytest tests/unit/persistence -v`  
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit: `git add src/testforge/persistence tests/unit/persistence && git commit -m "feat: persist task state and audit events"`
 

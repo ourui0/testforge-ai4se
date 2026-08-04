@@ -97,3 +97,14 @@
 - **修复与复审**：用户批准 `MappingProxyType`；原实现智能体完成 fix round 1；专项复审 `/root/task02_rereviewer` 判定 finding ADDRESSED、无新 breakage、无越界观察。
 - **人工修改**：无产品代码人工修改；用户决定共享模型和不可变转换语义，控制器只修订 SPEC/PLAN、环境与证据。
 - **PR 状态**：本地独立分支/worktree 已经评审并 `--no-ff` 合入；远程未配置，真实 PR/MR 待平台确定后补充。
+
+## 2026-08-04 · TASK-003
+
+- **阶段/任务**：正式 Task 3，事务化 SQLite 仓储与恢复语义。
+- **契约暂停与人工决定**：实现智能体 `/root/task03_implementer` 在 RED 前发现 `add_attempt`、`add_metric`、`add_audit_event` 缺少签名与语义；用户批准最小契约，SPEC/PLAN 修订提交为 `f2dfd2a`。
+- **TDD**：首次 RED 为 `ModuleNotFoundError: No module named 'testforge.persistence'`；扩展契约测试产生 8 个预期失败。实现者自发代码审查发现时区、跨线程内存数据库、可变任务快照和外键约束问题，以 5 个 RED 回归测试修复。控制层独立评审又发现预填指标重启后丢失，以文件数据库往返 RED 测试修复。
+- **提交/合并**：任务提交 `c3ad066`、`af5e6ee`、`50ccc40`；本地 PR 等价分支经 `--no-ff` 合入集成分支，merge commit `2390774`。
+- **验证**：最终持久化专项 `18 passed`，全套 `30 passed`，Ruff 检查通过；控制器在合并前独立复跑得到相同结果。
+- **评审**：只读评审智能体 `/root/task03_reviewer` 的唯一 Important 为初始指标未进入不可变指标历史；原实现者 fix round 1 后，专项复审判定 ADDRESSED、无新 Critical/Important，最终批准。
+- **人工修改**：无产品代码人工修改；控制器仅固化用户批准的公开契约、准备环境、生成审查包并更新证据文档。
+- **PR 状态**：本地独立分支/worktree 已评审并合入；远程仍未配置，真实 PR/MR 待平台确定后补充。
