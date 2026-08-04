@@ -908,11 +908,21 @@ class SQLiteTaskRepository:
     def create_approval(self, request: ApprovalRequest) -> None: ...
     def get_approval(self, approval_id: UUID) -> ApprovalRequest: ...
     def update_approval(self, request: ApprovalRequest) -> None: ...
+    def compare_and_set_approval(
+        self,
+        request: ApprovalRequest,
+        *,
+        expected_status: ApprovalStatus,
+    ) -> bool: ...
 ```
 
 `SystemClock` returns UTC-aware time. Every service operation rejects a naive clock value with `InputError`; `request` stamps `created_at` from the injected clock and `decide` stamps `decided_at` from it, normalizing aware values to UTC. `request` defaults to no expiry; a supplied expiry must be timezone-aware and later than the current clock value. Missing or duplicate approval IDs raise `InputError`. Repository updates preserve immutable identity, kind, patch hash, and creation time. Only `PENDING` requests may be decided initially. Repeating the same decision with the same hash and actor returns the stored request without changing `decided_at`; a conflicting repeat raises `PolicyViolation`. Before `decide` or `require_approved`, an expired request is persisted as `EXPIRED` and rejected. `require_approved` validates approved status, expiry, and the SHA-256 of the current patch.
 
 `AtomicPatchApplier` is deliberately separate from approval checking; callers must invoke `require_approved` first. It accepts only a 64-character lowercase hexadecimal expected hash and a regular-file or nonexistent target. It rejects symlinks and directories, treats a missing file as empty content, reads UTF-8 with `newline=""` so newline bytes are not normalized, and never creates the parent directory. It writes a same-directory temporary file with `newline=""`, flushes and `fsync`s it, uses `os.replace`, and removes the temporary file after any failure.
+
+Repository approval writes reject naive datetimes and normalize every aware timestamp to UTC at the persistence boundary, including direct repository calls. `compare_and_set_approval` performs one transactional `UPDATE ... WHERE id = ? AND status = ?`, preserves immutable fields, and returns whether exactly one row changed. `ApprovalService.decide` and expiry transitions use it; after a false result they reload to return an exact idempotent decision or reject a conflict.
+
+`AtomicPatchApplier(repository_root)` uses a project-level cooperative OS lock that serializes TestForge writers across processes and is released automatically when the owning process exits. While holding it, the applier records the initial target identity/type/hash, writes and syncs the temporary file, then immediately before `os.replace` rechecks that the target is still the same object with the same exact hash (or is still absent). Any difference raises `StaleWorkspaceError`. CLI/WebUI must show a short "do not edit the target" state during this section. Portable filesystems provide no atomic content compare-and-swap against non-cooperating editors; an external write in the final check/replace micro-window is a documented residual race, not a claimed guarantee.
 
 - [ ] **Step 1: Write the failing changed-patch approval test**
 
@@ -958,7 +968,7 @@ class ApprovalService:
 
 - [ ] **Step 4: Write RED/GREEN tests for stale-safe atomic write-back**
 
-Also cover injected-clock timestamps and expiry, naive-clock rejection, identical-decision idempotency, conflicting repeated decisions, missing/duplicate approval IDs, repository restart persistence, CRLF-sensitive hashing, invalid expected hashes, missing parents, directory/symlink rejection, successful replacement, and temporary-file cleanup on failure.
+Also cover injected-clock timestamps and expiry, naive-clock rejection, identical-decision idempotency, conflicting concurrent decisions, missing/duplicate approval IDs, non-UTC and naive repository-boundary timestamps, repository restart persistence, CRLF-sensitive hashing, invalid expected hashes, missing parents, directory/symlink rejection, cooperative lock acquisition, an edit between temporary-file creation and the final recheck, successful replacement, and temporary-file cleanup on failure.
 
 ```python
 def test_apply_rejects_changed_destination(tmp_path, applier, approved_patch):
