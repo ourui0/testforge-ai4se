@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Literal
 from uuid import UUID
 
-from sqlalchemy import event, select
+from sqlalchemy import event, select, update
 from sqlalchemy.engine import create_engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
@@ -146,6 +146,7 @@ class SQLiteTaskRepository:
             self._insert_event(session, self._event_row(event))
 
     def create_approval(self, request: ApprovalRequest) -> None:
+        request = self._normalize_approval_timestamps(request)
         try:
             with self._session_factory.begin() as session:
                 if session.get(ApprovalRow, str(request.id)) is not None:
@@ -162,6 +163,7 @@ class SQLiteTaskRepository:
             return self._approval_request(row)
 
     def update_approval(self, request: ApprovalRequest) -> None:
+        request = self._normalize_approval_timestamps(request)
         with self._session_factory.begin() as session:
             row = session.get(ApprovalRow, str(request.id))
             if row is None:
@@ -170,6 +172,29 @@ class SQLiteTaskRepository:
             row.actor = request.actor
             row.decided_at = request.decided_at
             row.expires_at = request.expires_at
+
+    def compare_and_set_approval(
+        self,
+        request: ApprovalRequest,
+        *,
+        expected_status: ApprovalStatus,
+    ) -> bool:
+        request = self._normalize_approval_timestamps(request)
+        with self._session_factory.begin() as session:
+            result = session.execute(
+                update(ApprovalRow)
+                .where(
+                    ApprovalRow.id == str(request.id),
+                    ApprovalRow.status == expected_status.value,
+                )
+                .values(
+                    status=request.status.value,
+                    actor=request.actor,
+                    decided_at=request.decided_at,
+                    expires_at=request.expires_at,
+                )
+            )
+            return result.rowcount == 1
 
     def list_task_events(self, task_id: UUID) -> tuple[AuditEvent, ...]:
         with self._session_factory() as session:
@@ -231,9 +256,11 @@ class SQLiteTaskRepository:
     @staticmethod
     def _approval_request(row: ApprovalRow) -> ApprovalRequest:
         def aware(value: datetime | None) -> datetime | None:
-            if value is None or value.tzinfo is not None:
+            if value is None:
                 return value
-            return value.replace(tzinfo=UTC)
+            if value.tzinfo is None or value.utcoffset() is None:
+                return value.replace(tzinfo=UTC)
+            return value.astimezone(UTC)
 
         return ApprovalRequest(
             id=UUID(row.id),
@@ -245,6 +272,20 @@ class SQLiteTaskRepository:
             decided_at=aware(row.decided_at),
             expires_at=aware(row.expires_at),
         )
+
+    @staticmethod
+    def _normalize_approval_timestamps(
+        request: ApprovalRequest,
+    ) -> ApprovalRequest:
+        normalized: dict[str, datetime] = {}
+        for field in ("created_at", "decided_at", "expires_at"):
+            value = getattr(request, field)
+            if value is None:
+                continue
+            if value.tzinfo is None or value.utcoffset() is None:
+                raise InputError(f"approval {field} must be timezone-aware")
+            normalized[field] = value.astimezone(UTC)
+        return request.model_copy(update=normalized)
 
     @staticmethod
     def _enable_foreign_keys(dbapi_connection, connection_record) -> None:

@@ -1,11 +1,13 @@
 import sqlite3
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta, timezone
+from threading import Barrier
 from uuid import uuid4
 
 import pytest
 
 from testforge.domain.errors import InputError, PolicyViolation
-from testforge.domain.models import ApprovalStatus
+from testforge.domain.models import ApprovalRequest, ApprovalStatus
 from testforge.governance.approval import ApprovalService, SystemClock, sha256_text
 from testforge.persistence.repository import SQLiteTaskRepository
 
@@ -26,6 +28,23 @@ class MutableClock:
 class NaiveClock:
     def now(self) -> datetime:
         return datetime(2026, 8, 5, 12, 0)  # noqa: DTZ001 - intentional
+
+
+class BarrierRepository(SQLiteTaskRepository):
+    def __init__(self, path, barrier: Barrier) -> None:
+        super().__init__(path)
+        self.barrier = barrier
+
+    def update_approval(self, request):
+        self.barrier.wait(timeout=5)
+        return super().update_approval(request)
+
+    def compare_and_set_approval(self, request, *, expected_status):
+        self.barrier.wait(timeout=5)
+        return super().compare_and_set_approval(
+            request,
+            expected_status=expected_status,
+        )
 
 
 @pytest.fixture
@@ -218,6 +237,39 @@ def test_identical_repeated_decision_is_idempotent(tmp_path):
     assert repeated.decided_at == datetime(2026, 8, 5, 12, 0, tzinfo=UTC)
 
 
+def test_concurrent_conflicting_decisions_have_one_winner(tmp_path):
+    repository = BarrierRepository(tmp_path / "testforge.db", Barrier(2))
+    service = ApprovalService(repository, FixedClock())
+    request = service.request(kind="apply_tests", patch="patch")
+
+    def decide(approved, actor):
+        try:
+            return service.decide(
+                request.id,
+                approved=approved,
+                patch_hash=request.patch_hash,
+                actor=actor,
+            )
+        except PolicyViolation as error:
+            return error
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = tuple(
+            future.result()
+            for future in (
+                executor.submit(decide, True, "approver"),
+                executor.submit(decide, False, "rejector"),
+            )
+        )
+
+    decisions = [result for result in results if not isinstance(result, Exception)]
+    conflicts = [result for result in results if isinstance(result, PolicyViolation)]
+    assert len(decisions) == 1
+    assert len(conflicts) == 1
+    assert "already decided" in str(conflicts[0])
+    assert repository.get_approval(request.id) == decisions[0]
+
+
 @pytest.mark.parametrize(
     ("approved", "patch_hash", "actor"),
     [
@@ -307,3 +359,88 @@ def test_repository_resumes_persisted_approval(tmp_path):
     )
 
     assert SQLiteTaskRepository(database).get_approval(request.id) == decided
+
+
+def test_repository_create_normalizes_aware_timestamps_to_utc(tmp_path):
+    repository = SQLiteTaskRepository(tmp_path / "testforge.db")
+    local_zone = timezone(timedelta(hours=8))
+    request = ApprovalRequest(
+        kind="apply_tests",
+        patch_hash=sha256_text("patch"),
+        status=ApprovalStatus.APPROVED,
+        actor="owner",
+        created_at=datetime(2026, 8, 5, 20, 0, tzinfo=local_zone),
+        decided_at=datetime(2026, 8, 5, 20, 5, tzinfo=local_zone),
+        expires_at=datetime(2026, 8, 5, 21, 0, tzinfo=local_zone),
+    )
+
+    repository.create_approval(request)
+
+    stored = repository.get_approval(request.id)
+    assert stored.created_at == datetime(2026, 8, 5, 12, 0, tzinfo=UTC)
+    assert stored.decided_at == datetime(2026, 8, 5, 12, 5, tzinfo=UTC)
+    assert stored.expires_at == datetime(2026, 8, 5, 13, 0, tzinfo=UTC)
+
+
+@pytest.mark.parametrize("write_method", ["update", "compare_and_set"])
+def test_repository_mutations_normalize_aware_timestamps_to_utc(tmp_path, write_method):
+    repository = SQLiteTaskRepository(tmp_path / "testforge.db")
+    request = ApprovalRequest(
+        kind="apply_tests",
+        patch_hash=sha256_text("patch"),
+        created_at=datetime(2026, 8, 5, 12, 0, tzinfo=UTC),
+    )
+    repository.create_approval(request)
+    local_zone = timezone(timedelta(hours=-4))
+    changed = request.model_copy(
+        update={
+            "status": ApprovalStatus.APPROVED,
+            "actor": "owner",
+            "created_at": datetime(2026, 8, 5, 8, 0, tzinfo=local_zone),
+            "decided_at": datetime(2026, 8, 5, 8, 5, tzinfo=local_zone),
+            "expires_at": datetime(2026, 8, 5, 9, 0, tzinfo=local_zone),
+        }
+    )
+
+    if write_method == "update":
+        repository.update_approval(changed)
+    else:
+        assert repository.compare_and_set_approval(
+            changed,
+            expected_status=ApprovalStatus.PENDING,
+        )
+
+    stored = repository.get_approval(request.id)
+    assert stored.created_at == datetime(2026, 8, 5, 12, 0, tzinfo=UTC)
+    assert stored.decided_at == datetime(2026, 8, 5, 12, 5, tzinfo=UTC)
+    assert stored.expires_at == datetime(2026, 8, 5, 13, 0, tzinfo=UTC)
+
+
+@pytest.mark.parametrize("write_method", ["create", "update", "compare_and_set"])
+@pytest.mark.parametrize("field", ["created_at", "decided_at", "expires_at"])
+def test_repository_writes_reject_naive_approval_timestamps(
+    tmp_path, write_method, field
+):
+    repository = SQLiteTaskRepository(tmp_path / "testforge.db")
+    request = ApprovalRequest(
+        kind="apply_tests",
+        patch_hash=sha256_text("patch"),
+        created_at=datetime(2026, 8, 5, 12, 0, tzinfo=UTC),
+        decided_at=datetime(2026, 8, 5, 12, 5, tzinfo=UTC),
+        expires_at=datetime(2026, 8, 5, 13, 0, tzinfo=UTC),
+    )
+    if write_method != "create":
+        repository.create_approval(request)
+    naive = datetime(2026, 8, 5, 12, 30)  # noqa: DTZ001 - intentional
+    invalid = request.model_copy(update={field: naive})
+
+    with pytest.raises(InputError, match=f"approval {field} must be timezone-aware"):
+        if write_method == "create":
+            repository.create_approval(invalid)
+        elif write_method == "update":
+            repository.update_approval(invalid)
+        else:
+            repository.compare_and_set_approval(
+                invalid,
+                expected_status=ApprovalStatus.PENDING,
+            )

@@ -62,7 +62,7 @@ class ApprovalService:
     ) -> ApprovalRequest:
         now = self._utc_now()
         request = self.repository.get_approval(approval_id)
-        self._reject_if_expired(request, now)
+        request = self._reject_if_expired(request, now)
         desired_status = (
             ApprovalStatus.APPROVED if approved else ApprovalStatus.REJECTED
         )
@@ -83,13 +83,24 @@ class ApprovalService:
                 "decided_at": now,
             }
         )
-        self.repository.update_approval(decided)
-        return decided
+        if self.repository.compare_and_set_approval(
+            decided,
+            expected_status=ApprovalStatus.PENDING,
+        ):
+            return decided
+        current = self.repository.get_approval(approval_id)
+        if (
+            current.status is desired_status
+            and current.patch_hash == patch_hash
+            and current.actor == actor
+        ):
+            return current
+        raise PolicyViolation("approval request was already decided")
 
     def require_approved(self, approval_id: UUID, patch: str) -> ApprovalRequest:
         now = self._utc_now()
         request = self.repository.get_approval(approval_id)
-        self._reject_if_expired(request, now)
+        request = self._reject_if_expired(request, now)
         if (
             request.status is not ApprovalStatus.APPROVED
             or request.patch_hash != sha256_text(patch)
@@ -103,10 +114,20 @@ class ApprovalService:
             raise InputError("clock must return a timezone-aware datetime")
         return current.astimezone(UTC)
 
-    def _reject_if_expired(self, request: ApprovalRequest, now: datetime) -> None:
-        if request.expires_at is None or request.expires_at > now:
-            return
-        if request.status is not ApprovalStatus.EXPIRED:
-            request = request.model_copy(update={"status": ApprovalStatus.EXPIRED})
-            self.repository.update_approval(request)
-        raise PolicyViolation("approval request has expired")
+    def _reject_if_expired(
+        self,
+        request: ApprovalRequest,
+        now: datetime,
+    ) -> ApprovalRequest:
+        while True:
+            if request.status is ApprovalStatus.EXPIRED:
+                raise PolicyViolation("approval request has expired")
+            if request.expires_at is None or request.expires_at > now:
+                return request
+            expired = request.model_copy(update={"status": ApprovalStatus.EXPIRED})
+            if self.repository.compare_and_set_approval(
+                expired,
+                expected_status=request.status,
+            ):
+                raise PolicyViolation("approval request has expired")
+            request = self.repository.get_approval(request.id)
