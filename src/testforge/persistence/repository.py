@@ -1,15 +1,18 @@
-from datetime import UTC
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 from uuid import UUID
 
 from sqlalchemy import event, select
 from sqlalchemy.engine import create_engine
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from testforge.domain.errors import InputError
 from testforge.domain.models import (
+    ApprovalRequest,
+    ApprovalStatus,
     AuditEvent,
     MetricSnapshot,
     TaskRecord,
@@ -17,6 +20,7 @@ from testforge.domain.models import (
 )
 from testforge.domain.state_machine import TaskEvent, TaskState
 from testforge.persistence.schema import (
+    ApprovalRow,
     AttemptRow,
     AuditEventRow,
     Base,
@@ -141,6 +145,32 @@ class SQLiteTaskRepository:
             self._require_task(session, event.task_id)
             self._insert_event(session, self._event_row(event))
 
+    def create_approval(self, request: ApprovalRequest) -> None:
+        try:
+            with self._session_factory.begin() as session:
+                if session.get(ApprovalRow, str(request.id)) is not None:
+                    raise InputError(f"approval {request.id} already exists")
+                session.add(self._approval_row(request))
+        except IntegrityError as error:
+            raise InputError(f"approval {request.id} already exists") from error
+
+    def get_approval(self, approval_id: UUID) -> ApprovalRequest:
+        with self._session_factory() as session:
+            row = session.get(ApprovalRow, str(approval_id))
+            if row is None:
+                raise InputError(f"approval {approval_id} does not exist")
+            return self._approval_request(row)
+
+    def update_approval(self, request: ApprovalRequest) -> None:
+        with self._session_factory.begin() as session:
+            row = session.get(ApprovalRow, str(request.id))
+            if row is None:
+                raise InputError(f"approval {request.id} does not exist")
+            row.status = request.status.value
+            row.actor = request.actor
+            row.decided_at = request.decided_at
+            row.expires_at = request.expires_at
+
     def list_task_events(self, task_id: UUID) -> tuple[AuditEvent, ...]:
         with self._session_factory() as session:
             statement = (
@@ -183,6 +213,37 @@ class SQLiteTaskRepository:
             event_type=event.event_type,
             reason=event.reason,
             occurred_at=event.occurred_at.astimezone(UTC),
+        )
+
+    @staticmethod
+    def _approval_row(request: ApprovalRequest) -> ApprovalRow:
+        return ApprovalRow(
+            id=str(request.id),
+            kind=request.kind,
+            patch_hash=request.patch_hash,
+            status=request.status.value,
+            actor=request.actor,
+            created_at=request.created_at,
+            decided_at=request.decided_at,
+            expires_at=request.expires_at,
+        )
+
+    @staticmethod
+    def _approval_request(row: ApprovalRow) -> ApprovalRequest:
+        def aware(value: datetime | None) -> datetime | None:
+            if value is None or value.tzinfo is not None:
+                return value
+            return value.replace(tzinfo=UTC)
+
+        return ApprovalRequest(
+            id=UUID(row.id),
+            kind=row.kind,
+            patch_hash=row.patch_hash,
+            status=ApprovalStatus(row.status),
+            actor=row.actor,
+            created_at=aware(row.created_at),
+            decided_at=aware(row.decided_at),
+            expires_at=aware(row.expires_at),
         )
 
     @staticmethod
