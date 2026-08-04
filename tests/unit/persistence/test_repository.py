@@ -85,6 +85,40 @@ def test_repository_resumes_persisted_task_and_events(tmp_path, sample_task):
     ] == ["started"]
 
 
+def test_repository_resumes_task_with_initial_metric_snapshots(tmp_path):
+    database = tmp_path / "testforge.db"
+    baseline = MetricSnapshot(
+        tests_passed=4,
+        tests_failed=1,
+        tests_skipped=0,
+        branch_coverage=80,
+        mutants_total=10,
+        mutants_killed=7,
+        mutants_survived=3,
+    )
+    latest = MetricSnapshot(
+        tests_passed=5,
+        tests_failed=0,
+        tests_skipped=0,
+        branch_coverage=95,
+        mutants_total=10,
+        mutants_killed=9,
+        mutants_survived=1,
+    )
+    task = TaskRecord(
+        project_id="project-1",
+        target_module="src/math.py",
+        baseline_metrics=baseline,
+        latest_metrics=latest,
+    )
+
+    SQLiteTaskRepository(database).create_task(task)
+
+    resumed_task = SQLiteTaskRepository(database).get_task(task.id)
+    assert resumed_task.baseline_metrics == baseline
+    assert resumed_task.latest_metrics == latest
+
+
 def test_in_memory_repository_is_shared_across_threads(sample_task):
     repo = SQLiteTaskRepository(Path(":memory:"))
     repo.create_task(sample_task)

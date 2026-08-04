@@ -53,6 +53,19 @@ class SQLiteTaskRepository:
                     ),
                 )
             )
+            session.flush()
+            for kind, metric in (
+                ("baseline", task.baseline_metrics),
+                ("latest", task.latest_metrics),
+            ):
+                if metric is not None:
+                    session.add(
+                        MetricRow(
+                            task_id=str(task.id),
+                            kind=kind,
+                            metric=metric.model_dump(mode="json"),
+                        )
+                    )
 
     def get_task(self, task_id: UUID) -> TaskRecord:
         with self._session_factory() as session:
