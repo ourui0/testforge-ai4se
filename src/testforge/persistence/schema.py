@@ -1,0 +1,52 @@
+from datetime import datetime
+
+from sqlalchemy import JSON, DateTime, ForeignKey, String
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class TaskRow(Base):
+    __tablename__ = "tasks"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    state: Mapped[str] = mapped_column(String(48), nullable=False, index=True)
+    payload: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+
+
+class AuditEventRow(Base):
+    __tablename__ = "audit_events"
+
+    sequence: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    id: Mapped[str] = mapped_column(String(36), nullable=False, unique=True)
+    task_id: Mapped[str] = mapped_column(
+        ForeignKey("tasks.id"), nullable=False, index=True
+    )
+    event_type: Mapped[str] = mapped_column(String(48), nullable=False)
+    reason: Mapped[str] = mapped_column(String(512), nullable=False)
+    occurred_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
+
+class AttemptRow(Base):
+    __tablename__ = "attempts"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    task_id: Mapped[str] = mapped_column(
+        ForeignKey("tasks.id"), nullable=False, index=True
+    )
+    proposal: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+
+
+class MetricRow(Base):
+    __tablename__ = "metrics"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    task_id: Mapped[str] = mapped_column(
+        ForeignKey("tasks.id"), nullable=False, index=True
+    )
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    metric: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
