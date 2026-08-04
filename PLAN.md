@@ -276,7 +276,7 @@ Commit: `git add pyproject.toml src/testforge/__init__.py src/testforge/config.p
 
 ### Task 2: Domain Models and Pure State Machine
 
-> **Approved clarification:** the original plan named shared outputs without schemas. Human approval added the minimal immutable contracts already consumed by Tasks 3–12: `RefactorProposal`, `FeedbackPacket`, `BudgetUsage`, `AttemptSummary`, `TaskRecord`, `ApprovalStatus`, `ApprovalRequest`, and `AuditEvent`.
+> **Approved clarifications:** (1) the original plan named shared outputs without schemas, so human approval added the minimal immutable contracts already consumed by Tasks 3–12; (2) task review found that a public mutable transition dictionary violates the pure, closed state-machine guarantee, so human approval requires a read-only `MappingProxyType` plus a mutation-rejection regression test.
 
 **Files:**
 - Create: `src/testforge/domain/__init__.py`
@@ -294,7 +294,8 @@ Commit: `git add pyproject.toml src/testforge/__init__.py src/testforge/config.p
 - [ ] **Step 1: Write failing transition tests**
 
 ```python
-from testforge.domain.state_machine import TaskEvent, TaskState, transition
+import pytest
+from testforge.domain.state_machine import TRANSITIONS, TaskEvent, TaskState, transition
 
 
 def test_evaluation_retries_when_budget_remains():
@@ -307,6 +308,11 @@ def test_refactor_request_pauses_for_approval():
 
 def test_quality_pass_waits_for_apply_approval():
     assert transition(TaskState.EVALUATING, TaskEvent.QUALITY_PASSED) is TaskState.AWAITING_APPLY_APPROVAL
+
+
+def test_transition_table_rejects_external_mutation():
+    with pytest.raises(TypeError):
+        TRANSITIONS[(TaskState.CREATED, TaskEvent.APPLY_SUCCEEDED)] = TaskState.COMPLETED
 ```
 
 - [ ] **Step 2: Run transition tests to verify RED**
@@ -319,6 +325,8 @@ Expected: FAIL because the domain package does not exist.
 ```python
 # src/testforge/domain/state_machine.py
 from enum import StrEnum
+from types import MappingProxyType
+from typing import Mapping
 from testforge.domain.errors import InvalidTransition
 
 
@@ -372,7 +380,7 @@ def transition(state: TaskState, event: TaskEvent) -> TaskState:
     return TRANSITIONS[key]
 
 
-TRANSITIONS: dict[tuple[TaskState, TaskEvent], TaskState] = {
+_TRANSITIONS: dict[tuple[TaskState, TaskEvent], TaskState] = {
     (TaskState.CREATED, TaskEvent.START): TaskState.VALIDATING_INPUT,
     (TaskState.VALIDATING_INPUT, TaskEvent.INPUT_VALID): TaskState.PREPARING_SANDBOX,
     (TaskState.PREPARING_SANDBOX, TaskEvent.SANDBOX_READY): TaskState.BASELINING,
@@ -393,12 +401,14 @@ TRANSITIONS: dict[tuple[TaskState, TaskEvent], TaskState] = {
 }
 
 for active_state in set(TaskState) - {TaskState.COMPLETED, TaskState.NO_ACTION_NEEDED, TaskState.STOPPED, TaskState.FAILED, TaskState.CANCELLED}:
-    TRANSITIONS[(active_state, TaskEvent.CANCEL)] = TaskState.CANCELLED
-    TRANSITIONS[(active_state, TaskEvent.ERROR)] = TaskState.FAILED
-    TRANSITIONS[(active_state, TaskEvent.WORKSPACE_CHANGED)] = TaskState.STALE
+    _TRANSITIONS[(active_state, TaskEvent.CANCEL)] = TaskState.CANCELLED
+    _TRANSITIONS[(active_state, TaskEvent.ERROR)] = TaskState.FAILED
+    _TRANSITIONS[(active_state, TaskEvent.WORKSPACE_CHANGED)] = TaskState.STALE
 
 for budgeted_state in {TaskState.GENERATING, TaskState.TESTING, TaskState.MEASURING_COVERAGE, TaskState.MUTATION_TESTING, TaskState.EVALUATING}:
-    TRANSITIONS[(budgeted_state, TaskEvent.BUDGET_EXHAUSTED)] = TaskState.STOPPED
+    _TRANSITIONS[(budgeted_state, TaskEvent.BUDGET_EXHAUSTED)] = TaskState.STOPPED
+
+TRANSITIONS: Mapping[tuple[TaskState, TaskEvent], TaskState] = MappingProxyType(_TRANSITIONS)
 ```
 
 - [ ] **Step 4: Write and implement validated domain model tests**

@@ -79,3 +79,10 @@
 - **人工决定**：用户明确回复“批准”，同意补齐后续任务已经实际消费的最小共享不可变领域模型。
 - **修订范围**：SPEC 数据模型与 PLAN Task 2 增加八个共享契约及其默认值、边界和不可变性测试；不提前实现仓储、审批服务、反馈算法或 Agent 引擎。
 - **后续**：重新生成 Task 2 简报，恢复原实现智能体继续严格 TDD。
+
+## 2026-08-04 · TASK-002-REVIEW-RULING
+
+- **评审发现**：只读评审智能体 `/root/task02_reviewer` 判定公开可变 `TRANSITIONS` 可被外部注入非法转换，属于 Important，并与 PLAN 示例中的公开 `dict` 写法发生 plan-mandated 冲突。
+- **人工决定**：用户明确回复“批准 Task 2 使用不可变转换表”，选择状态机封闭性与确定性语义优先于原示例字面写法。
+- **修订**：SPEC 明确转换集合初始化后只读；PLAN 使用内部 `_TRANSITIONS` 构造表，并以 `MappingProxyType` 暴露 `TRANSITIONS`；新增外部赋值抛出 `TypeError` 的回归测试。
+- **后续**：恢复原 Task 2 实现智能体完成 fix round 1，随后进行仅针对该 finding 与修复 diff 的专项复审。
