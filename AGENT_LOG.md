@@ -70,3 +70,12 @@
 - **提交/合并**：实现提交 `f617cf7`（`build: add validated project configuration`）；本地 PR 等价分支经 `--no-ff` 合入集成分支，merge commit `313de8f`。远程尚未配置，真实 PR/MR 待平台确定后补充。
 - **评审**：只读评审智能体 `/root/task01_reviewer` 判定 Spec compliant、Task quality Approved；Critical/Important/Minor 均为 0。
 - **人工修改**：无产品代码人工修改；控制器仅更新 PLAN/AGENT_LOG/进度账本。
+
+## 2026-08-04 · TASK-002-PLAN-REVISION
+
+- **阶段/任务**：Task 2 实现前共享领域契约澄清。
+- **触发问题**：实现智能体 `/root/task02_implementer` 指出 Task 2 接口承诺 `RefactorProposal`、`FeedbackPacket`、`TaskRecord`，但正文没有字段；Tasks 3–12 还引用未定义的 `BudgetUsage`、`AttemptSummary`、`ApprovalRequest` 和 `AuditEvent`。
+- **智能体纪律**：在 RED 前暂停，没有创建 Task 2 测试、产品代码或提交，避免自行推断承重数据契约。
+- **人工决定**：用户明确回复“批准”，同意补齐后续任务已经实际消费的最小共享不可变领域模型。
+- **修订范围**：SPEC 数据模型与 PLAN Task 2 增加八个共享契约及其默认值、边界和不可变性测试；不提前实现仓储、审批服务、反馈算法或 Agent 引擎。
+- **后续**：重新生成 Task 2 简报，恢复原实现智能体继续严格 TDD。

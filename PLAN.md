@@ -276,6 +276,8 @@ Commit: `git add pyproject.toml src/testforge/__init__.py src/testforge/config.p
 
 ### Task 2: Domain Models and Pure State Machine
 
+> **Approved clarification:** the original plan named shared outputs without schemas. Human approval added the minimal immutable contracts already consumed by Tasks 3–12: `RefactorProposal`, `FeedbackPacket`, `BudgetUsage`, `AttemptSummary`, `TaskRecord`, `ApprovalStatus`, `ApprovalRequest`, and `AuditEvent`.
+
 **Files:**
 - Create: `src/testforge/domain/__init__.py`
 - Create: `src/testforge/domain/models.py`
@@ -402,7 +404,20 @@ for budgeted_state in {TaskState.GENERATING, TaskState.TESTING, TaskState.MEASUR
 - [ ] **Step 4: Write and implement validated domain model tests**
 
 ```python
-from testforge.domain.models import MetricSnapshot, TestProposal
+import pytest
+from pydantic import ValidationError
+from testforge.config import TaskBudget
+from testforge.domain.models import (
+    ApprovalRequest,
+    AttemptSummary,
+    BudgetUsage,
+    FeedbackPacket,
+    MetricSnapshot,
+    RefactorProposal,
+    TaskRecord,
+    TestProposal,
+)
+from testforge.domain.state_machine import TaskState
 
 
 def test_test_proposal_is_a_single_test_file_replacement():
@@ -413,6 +428,26 @@ def test_test_proposal_is_a_single_test_file_replacement():
 def test_metric_snapshot_computes_mutation_score():
     metrics = MetricSnapshot(tests_passed=4, tests_failed=0, tests_skipped=0, branch_coverage=75.0, mutants_total=4, mutants_killed=3, mutants_survived=1)
     assert metrics.mutation_score == 75.0
+
+
+def test_shared_domain_contracts_have_safe_immutable_defaults():
+    refactor = RefactorProposal(path="src/math.py", patch="@@ -1 +1 @@", reason="isolate clock", risk="low")
+    feedback = FeedbackPacket(failure_category="surviving_mutant", surviving_mutants=("src/math.py:1",), constraints_for_next_attempt=("add a boundary assertion",))
+    usage = BudgetUsage(attempts=5, llm_calls=1, active_seconds=2, mutants=3)
+    attempt = AttemptSummary(branch_coverage=80.0, mutation_score=75.0)
+    task = TaskRecord(project_id="project-1", target_module="src/math.py", attempt_summaries=(attempt,))
+    assert refactor.alternatives == ()
+    assert feedback.stagnated is False
+    assert usage.exhausted(TaskBudget()) is True
+    assert task.state is TaskState.CREATED
+    assert task.pending_patch is None
+    with pytest.raises(ValidationError):
+        task.state = TaskState.FAILED
+
+
+def test_approval_request_requires_sha256_patch_hash():
+    with pytest.raises(ValidationError):
+        ApprovalRequest(kind="apply_tests", patch_hash="not-a-sha256")
 ```
 
 Implement immutable Pydantic models and the errors `InputError`, `ConfigurationError`, `CredentialError`, `LLMError`, `SandboxError`, `ToolExecutionError`, `PolicyViolation`, `StaleWorkspaceError`, and `InvalidTransition`.
@@ -485,6 +520,95 @@ class TestProposal(BaseModel):
     strategy: str
 
 
+class RefactorProposal(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    path: str
+    patch: str
+    reason: str
+    risk: str
+    alternatives: tuple[str, ...] = ()
+
+
+class FeedbackPacket(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    failure_category: str = Field(min_length=1)
+    surviving_mutants: tuple[str, ...] = ()
+    constraints_for_next_attempt: tuple[str, ...] = ()
+    stagnated: bool = False
+
+
+class BudgetUsage(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    attempts: int = Field(default=0, ge=0)
+    llm_calls: int = Field(default=0, ge=0)
+    active_seconds: int = Field(default=0, ge=0)
+    mutants: int = Field(default=0, ge=0)
+
+    def exhausted(self, budget: TaskBudget) -> bool:
+        return (
+            self.attempts >= budget.max_attempts
+            or self.llm_calls >= budget.max_llm_calls
+            or self.active_seconds >= budget.max_active_seconds
+            or self.mutants >= budget.max_mutants
+        )
+
+
+class AttemptSummary(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    branch_coverage: float = Field(ge=0, le=100)
+    mutation_score: float = Field(ge=0, le=100)
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+class ApprovalStatus(StrEnum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    EXPIRED = "expired"
+
+
+class ApprovalRequest(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    id: UUID = Field(default_factory=uuid4)
+    kind: Literal["refactor", "apply_tests"]
+    patch_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    status: ApprovalStatus = ApprovalStatus.PENDING
+    actor: str | None = None
+    created_at: datetime = Field(default_factory=utc_now)
+    decided_at: datetime | None = None
+    expires_at: datetime | None = None
+
+
+class AuditEvent(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    id: UUID = Field(default_factory=uuid4)
+    task_id: UUID
+    event_type: str = Field(min_length=1)
+    reason: str
+    occurred_at: datetime = Field(default_factory=utc_now)
+
+
+class TaskRecord(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    id: UUID = Field(default_factory=uuid4)
+    project_id: str = Field(min_length=1)
+    target_module: str = Field(min_length=1)
+    state: TaskState = TaskState.CREATED
+    budget: TaskBudget = TaskBudget()
+    quality: QualityThreshold = QualityThreshold()
+    usage: BudgetUsage = BudgetUsage()
+    baseline_metrics: MetricSnapshot | None = None
+    latest_metrics: MetricSnapshot | None = None
+    pending_patch: str | None = None
+    memory_tags: tuple[str, ...] = ()
+    constraints: tuple[str, ...] = ()
+    attempt_summaries: tuple[AttemptSummary, ...] = ()
+    surviving_mutants: tuple[str, ...] = ()
+
+
 class TransitionResult(BaseModel):
     model_config = ConfigDict(frozen=True)
     previous_state: TaskState
@@ -492,6 +616,8 @@ class TransitionResult(BaseModel):
     blocked: bool
     reason: str
 ```
+
+The model module imports `datetime`, `timezone`, `UUID`, `uuid4`, `Literal`, `TaskBudget`, `QualityThreshold`, and `TaskState`; define `utc_now()` as `datetime.now(timezone.utc)`. These value objects are contracts only: Task 2 does not implement repositories, approval decisions, feedback algorithms, or engine behavior.
 
 - [ ] **Step 5: Run domain tests and commit**
 

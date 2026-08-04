@@ -228,12 +228,18 @@ OpenAI 模型服务、Docker Engine、pytest、coverage.py、mutmut、操作系�
 ## 9. 数据模型
 
 - `Project`：仓库标识、规范化路径、测试目录、pytest/Docker 配置和版本；
-- `Task`：目标模块、状态、质量门槛、预算快照、基线哈希和结果；
-- `Attempt`：轮次、提案摘要、补丁哈希、工具结果、指标变化和失败分类；
+- `Task`：UUID、项目 ID、目标模块、状态、质量门槛、预算与用量快照、基线/最新指标、待审批补丁、记忆标签、约束、尝试摘要和存活变异；
+- `Attempt`：轮次、策略、分支覆盖率、变异得分、提案摘要、补丁哈希、工具结果和失败分类；
 - `MetricSnapshot`：pytest、覆盖率和变异统计；
-- `ApprovalRequest`：审批类型、补丁哈希、风险说明、状态和决定信息；
+- `TestProposal`：单个测试文件路径、完整替换内容和生成策略；
+- `RefactorProposal`：单个生产文件路径、补丁、必要性理由、风险和替代方案；
+- `FeedbackPacket`：失败类别、存活变异、下一轮确定性约束和停滞标记；
+- `BudgetUsage`：已用生成轮次、LLM 调用、主动执行秒数和变异数量；
+- `ApprovalRequest`：UUID、审批类型、SHA-256 补丁哈希、状态、创建/决定/过期时间和决定者；
+- `AuditEvent`：UUID、任务 ID、事件类型、脱敏原因和发生时间；
 - `MemoryEntry`：类型、内容摘要、来源任务、版本和过期时间；
-- `AuditEvent`：状态转换、工具类别、治理决定和脱敏错误摘要。
+
+以上共享领域值对象均为不可变 Pydantic 模型。Task 2 定义 Tasks 3–12 共同依赖的契约；具体仓储表、审批服务、反馈算法和记忆实体仍由各自后续任务实现。
 
 状态转换与审计事件在同一事务中提交。CLI 默认使用 SQLite；服务端复用仓储接口，第一版不同时实现 PostgreSQL。
 
