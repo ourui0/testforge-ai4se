@@ -1,7 +1,8 @@
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import pytest
 
+import testforge.governance.policy as policy_module
 from testforge.config import ProjectConfig, TaskBudget
 from testforge.domain.errors import PolicyViolation
 from testforge.domain.models import BudgetUsage, RefactorProposal
@@ -46,6 +47,34 @@ def test_rejects_root_anchored_path(policy: GovernancePolicy) -> None:
         policy.validate_read("/tests/test_calculator.py")
 
 
+@pytest.mark.parametrize(
+    "windows_path",
+    [
+        r"C:\outside\secret.py",
+        r"C:relative.py",
+        r"\rooted\file.py",
+        r"\\server\share\file.py",
+    ],
+)
+def test_rejects_windows_root_forms_under_posix_grammar(
+    policy: GovernancePolicy,
+    monkeypatch: pytest.MonkeyPatch,
+    windows_path: str,
+) -> None:
+    monkeypatch.setattr(policy_module, "Path", PurePosixPath)
+
+    with pytest.raises(PolicyViolation, match="repository-relative"):
+        policy.validate_read(windows_path)
+
+
+@pytest.mark.parametrize("posix_path", ["/outside/secret.py", "//server/share/file.py"])
+def test_rejects_posix_absolute_paths(
+    policy: GovernancePolicy, posix_path: str
+) -> None:
+    with pytest.raises(PolicyViolation, match="repository-relative"):
+        policy.validate_read(posix_path)
+
+
 def test_returns_canonical_repository_path(policy: GovernancePolicy) -> None:
     assert policy.validate_read("tests/../src/calculator.py") == (
         policy.repository_root / "src" / "calculator.py"
@@ -67,6 +96,48 @@ def test_rejects_absolute_configured_paths(tmp_path: Path, field: str) -> None:
 
     with pytest.raises(PolicyViolation, match="repository-relative"):
         GovernancePolicy(ProjectConfig(**values))  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    ("field", "escaped_path"),
+    [
+        ("tests_root", Path("../outside-tests")),
+        ("target_module", "../outside.py"),
+    ],
+)
+def test_rejects_configured_parent_escape(
+    tmp_path: Path, field: str, escaped_path: str | Path
+) -> None:
+    values: dict[str, object] = {
+        "repository_root": tmp_path,
+        "target_module": "src/calculator.py",
+        "tests_root": Path("tests"),
+    }
+    values[field] = escaped_path
+
+    with pytest.raises(PolicyViolation, match="outside repository"):
+        GovernancePolicy(ProjectConfig(**values))  # type: ignore[arg-type]
+
+
+def test_rejects_configured_symlink_escape_with_nonexistent_suffix(
+    tmp_path: Path,
+) -> None:
+    outside = tmp_path.parent / f"{tmp_path.name}-outside-directory"
+    outside.mkdir()
+    link = tmp_path / "linked-directory"
+    try:
+        link.symlink_to(outside, target_is_directory=True)
+    except OSError:
+        pytest.skip("test environment does not permit symlink creation")
+
+    config = ProjectConfig(
+        repository_root=tmp_path,
+        target_module="src/calculator.py",
+        tests_root=Path("linked-directory/nonexistent"),
+    )
+
+    with pytest.raises(PolicyViolation, match="outside repository"):
+        GovernancePolicy(config)
 
 
 def test_rejects_symlink_escape(policy: GovernancePolicy, tmp_path: Path) -> None:

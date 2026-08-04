@@ -1,4 +1,4 @@
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
 from testforge.config import ProjectConfig, TaskBudget
 from testforge.domain.errors import PolicyViolation
@@ -13,12 +13,12 @@ class GovernancePolicy:
         max_patch_lines: int = 600,
     ) -> None:
         self.repository_root = config.repository_root.resolve()
-        self._require_repository_relative(config.tests_root)
-        self._require_repository_relative(config.target_module)
         self.tests_root = config.tests_root
         self.target_module = config.target_module
         self.max_patch_bytes = max_patch_bytes
         self.max_patch_lines = max_patch_lines
+        self._tests_root_path = self.validate_read(str(config.tests_root))
+        self._target_module_path = self.validate_read(config.target_module)
 
     def validate_read(self, relative_path: str) -> Path:
         requested_path = Path(relative_path)
@@ -31,8 +31,7 @@ class GovernancePolicy:
 
     def validate_test_proposal(self, proposal: TestProposal) -> Path:
         candidate = self.validate_read(proposal.path)
-        tests_root = (self.repository_root / self.tests_root).resolve()
-        if not candidate.is_relative_to(tests_root):
+        if not candidate.is_relative_to(self._tests_root_path):
             raise PolicyViolation("candidate is outside configured test directory")
         if not proposal.content and candidate.is_file():
             raise PolicyViolation("candidate is a deletion of an existing test")
@@ -41,8 +40,7 @@ class GovernancePolicy:
 
     def validate_refactor_proposal(self, proposal: RefactorProposal) -> Path:
         candidate = self.validate_read(proposal.path)
-        target = self.validate_read(self.target_module)
-        if candidate != target:
+        if candidate != self._target_module_path:
             raise PolicyViolation("candidate is outside configured target module")
         self._validate_patch(proposal.patch)
         return candidate
@@ -67,6 +65,6 @@ class GovernancePolicy:
 
     @staticmethod
     def _require_repository_relative(path: str | Path) -> None:
-        requested_path = Path(path)
-        if requested_path.anchor:
+        path_text = str(path)
+        if PurePosixPath(path_text).anchor or PureWindowsPath(path_text).anchor:
             raise PolicyViolation("path must be repository-relative")
