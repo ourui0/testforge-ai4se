@@ -223,6 +223,8 @@ LLM 只能请求以下领域工具：读取目标源码、读取相关测试、�
 - `TaskRepository`：任务、尝试、指标、审批和审计事件持久化；
 - `ApplicationService`：供 CLI 与 WebUI 共用的用例接口。
 
+`TaskRepository` 的附加写入契约固定为：`add_attempt(task_id, proposal)` 追加不可变测试提案；`add_metric(task_id, metric, kind="baseline" | "latest")` 追加不可变指标并在同一事务内更新任务对应指标快照；`add_audit_event(event)` 追加不可变审计事件；`list_task_events(task_id)` 按发生时间及写入顺序稳定返回事件。所有写入先验证任务存在，失败时完整回滚，成功时不返回额外值。
+
 ### 8.2 外部依赖
 
 OpenAI 模型服务、Docker Engine、pytest、coverage.py、mutmut、操作系统钥匙串，以及可选的容器部署平台。mock 模式不依赖网络、真实模型或真实凭据。

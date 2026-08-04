@@ -651,6 +651,23 @@ Commit: `git add src/testforge/domain tests/conftest.py tests/unit/domain && git
 - Consumes: `TaskRecord`, `TaskState`, `MetricSnapshot`, and approval/audit value objects from Task 2.
 - Produces: `SQLiteTaskRepository.create_task`, `get_task`, `record_transition`, `add_attempt`, `add_metric`, `add_audit_event`, and `list_task_events`.
 
+The repository contracts are explicit and return `None` for successful writes:
+
+```python
+def add_attempt(self, task_id: UUID, proposal: TestProposal) -> None: ...
+def add_metric(
+    self,
+    task_id: UUID,
+    metric: MetricSnapshot,
+    *,
+    kind: Literal["baseline", "latest"],
+) -> None: ...
+def add_audit_event(self, event: AuditEvent) -> None: ...
+def list_task_events(self, task_id: UUID) -> tuple[AuditEvent, ...]: ...
+```
+
+`add_attempt` appends an immutable proposal snapshot. `add_metric` appends an immutable metric snapshot and atomically updates the matching `TaskRecord.baseline_metrics` or `TaskRecord.latest_metrics` field; any other `kind` is rejected. `add_audit_event` appends the supplied immutable event. Every write validates that the task exists and rolls back completely on failure. Event listing is deterministic by `occurred_at` and then insertion order.
+
 - [ ] **Step 1: Write the failing atomic-transition test**
 
 ```python
