@@ -86,3 +86,14 @@
 - **人工决定**：用户明确回复“批准 Task 2 使用不可变转换表”，选择状态机封闭性与确定性语义优先于原示例字面写法。
 - **修订**：SPEC 明确转换集合初始化后只读；PLAN 使用内部 `_TRANSITIONS` 构造表，并以 `MappingProxyType` 暴露 `TRANSITIONS`；新增外部赋值抛出 `TypeError` 的回归测试。
 - **后续**：恢复原 Task 2 实现智能体完成 fix round 1，随后进行仅针对该 finding 与修复 diff 的专项复审。
+
+## 2026-08-04 · TASK-002
+
+- **阶段/任务**：正式 Task 2，领域模型与纯状态机。
+- **隔离与 context**：分支 `task-02-domain-state`；实现智能体 `/root/task02_implementer` 使用经两次人工批准修订的 Task 2 简报；主控制器仅准备 `.venv` 和依赖。
+- **TDD**：状态机 RED 为缺少 `testforge.domain`，模型 RED 为缺少 `testforge.domain.models`；初始 GREEN 为 domain 7 passed/full 11 passed。不可变性回归 RED 为“未抛出 TypeError”，修复后 transition 4 passed/domain 8 passed/full 12 passed。
+- **提交**：`0003258`（领域模型与状态机）、`0d87095`（封闭转换表）；合并提交 `29562a2`。
+- **首次评审**：`/root/task02_reviewer` 判定模型和转换完整，但公开可变 `TRANSITIONS` 为 Important；因与 PLAN 示例冲突，交由用户裁决。
+- **修复与复审**：用户批准 `MappingProxyType`；原实现智能体完成 fix round 1；专项复审 `/root/task02_rereviewer` 判定 finding ADDRESSED、无新 breakage、无越界观察。
+- **人工修改**：无产品代码人工修改；用户决定共享模型和不可变转换语义，控制器只修订 SPEC/PLAN、环境与证据。
+- **PR 状态**：本地独立分支/worktree 已经评审并 `--no-ff` 合入；远程未配置，真实 PR/MR 待平台确定后补充。

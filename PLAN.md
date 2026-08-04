@@ -278,6 +278,8 @@ Commit: `git add pyproject.toml src/testforge/__init__.py src/testforge/config.p
 
 > **Approved clarifications:** (1) the original plan named shared outputs without schemas, so human approval added the minimal immutable contracts already consumed by Tasks 3–12; (2) task review found that a public mutable transition dictionary violates the pure, closed state-machine guarantee, so human approval requires a read-only `MappingProxyType` plus a mutation-rejection regression test.
 
+> **Formal completion:** implementer `/root/task02_implementer`; commits `0003258`, `0d87095`; integration merge `29562a2`; RED observed for state machine, models, and immutable-transition regression; full suite `12 passed`; initial review finding fixed and scoped re-review clean.
+
 **Files:**
 - Create: `src/testforge/domain/__init__.py`
 - Create: `src/testforge/domain/models.py`
@@ -291,7 +293,7 @@ Commit: `git add pyproject.toml src/testforge/__init__.py src/testforge/config.p
 - Consumes: `TaskBudget`, `QualityThreshold` from Task 1.
 - Produces: `TaskState`, `TaskEvent`, `transition(state, event)`, `MetricSnapshot`, `TestProposal`, `RefactorProposal`, `FeedbackPacket`, `TaskRecord`, and stable domain errors.
 
-- [ ] **Step 1: Write failing transition tests**
+- [x] **Step 1: Write failing transition tests**
 
 ```python
 import pytest
@@ -315,12 +317,12 @@ def test_transition_table_rejects_external_mutation():
         TRANSITIONS[(TaskState.CREATED, TaskEvent.APPLY_SUCCEEDED)] = TaskState.COMPLETED
 ```
 
-- [ ] **Step 2: Run transition tests to verify RED**
+- [x] **Step 2: Run transition tests to verify RED**
 
 Run: `python -m pytest tests/unit/domain/test_state_machine.py -v`  
 Expected: FAIL because the domain package does not exist.
 
-- [ ] **Step 3: Implement enums, legal transition table, and illegal-transition error**
+- [x] **Step 3: Implement enums, legal transition table, and illegal-transition error**
 
 ```python
 # src/testforge/domain/state_machine.py
@@ -411,7 +413,7 @@ for budgeted_state in {TaskState.GENERATING, TaskState.TESTING, TaskState.MEASUR
 TRANSITIONS: Mapping[tuple[TaskState, TaskEvent], TaskState] = MappingProxyType(_TRANSITIONS)
 ```
 
-- [ ] **Step 4: Write and implement validated domain model tests**
+- [x] **Step 4: Write and implement validated domain model tests**
 
 ```python
 import pytest
@@ -629,7 +631,7 @@ class TransitionResult(BaseModel):
 
 The model module imports `datetime`, `timezone`, `UUID`, `uuid4`, `Literal`, `TaskBudget`, `QualityThreshold`, and `TaskState`; define `utc_now()` as `datetime.now(timezone.utc)`. These value objects are contracts only: Task 2 does not implement repositories, approval decisions, feedback algorithms, or engine behavior.
 
-- [ ] **Step 5: Run domain tests and commit**
+- [x] **Step 5: Run domain tests and commit**
 
 Run: `python -m pytest tests/unit/domain -v`  
 Expected: PASS.  
