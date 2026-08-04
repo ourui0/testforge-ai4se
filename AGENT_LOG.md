@@ -22,3 +22,12 @@
 - **产出**：`PLAN.md`、`docs/superpowers/plans/2026-08-04-testforge-harness.md`，以及对应的 `SPEC.md` / `SPEC_PROCESS.md` 修订。
 - **subagent/commit**：计划编写阶段未派发 subagent；计划与规约修订提交为 `cb30a65`。
 - **教训**：沙箱的运行时隔离与依赖供应必须同时设计；只规定“禁网运行”不足以让陌生项目可执行。
+
+## 2026-08-04 · PLAN-APPROVAL-001
+
+- **阶段/任务**：实现计划与计划自检引发的 SPEC 修订审批。
+- **Superpowers 技能**：`writing-plans`。
+- **人工决定**：用户明确回复“批准 PLAN 与 SPEC 修订”。
+- **批准范围**：19 个 TDD 实现任务、依赖/并行关系、双阶段评审、冷启动硬门槛，以及可信仓库依赖镜像的新增安全边界。
+- **后续门槛**：使用与主开发 Codex 不同类型的全新智能体，仅提供 `SPEC.md` 与 `PLAN.md`，试做 1–2 个任务；完成记录与修订前禁止正式实现。
+- **subagent/commit**：未派发 Codex subagent，因为同类型代理不满足课程冷启动要求；本条记录提交后附哈希。
