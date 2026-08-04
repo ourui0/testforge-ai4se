@@ -1,4 +1,6 @@
 from enum import StrEnum
+from types import MappingProxyType
+from typing import Mapping
 
 from testforge.domain.errors import InvalidTransition
 
@@ -53,7 +55,7 @@ def transition(state: TaskState, event: TaskEvent) -> TaskState:
     return TRANSITIONS[key]
 
 
-TRANSITIONS: dict[tuple[TaskState, TaskEvent], TaskState] = {
+_TRANSITIONS: dict[tuple[TaskState, TaskEvent], TaskState] = {
     (TaskState.CREATED, TaskEvent.START): TaskState.VALIDATING_INPUT,
     (TaskState.VALIDATING_INPUT, TaskEvent.INPUT_VALID): TaskState.PREPARING_SANDBOX,
     (TaskState.PREPARING_SANDBOX, TaskEvent.SANDBOX_READY): TaskState.BASELINING,
@@ -80,9 +82,9 @@ for active_state in set(TaskState) - {
     TaskState.FAILED,
     TaskState.CANCELLED,
 }:
-    TRANSITIONS[(active_state, TaskEvent.CANCEL)] = TaskState.CANCELLED
-    TRANSITIONS[(active_state, TaskEvent.ERROR)] = TaskState.FAILED
-    TRANSITIONS[(active_state, TaskEvent.WORKSPACE_CHANGED)] = TaskState.STALE
+    _TRANSITIONS[(active_state, TaskEvent.CANCEL)] = TaskState.CANCELLED
+    _TRANSITIONS[(active_state, TaskEvent.ERROR)] = TaskState.FAILED
+    _TRANSITIONS[(active_state, TaskEvent.WORKSPACE_CHANGED)] = TaskState.STALE
 
 for budgeted_state in {
     TaskState.GENERATING,
@@ -91,4 +93,7 @@ for budgeted_state in {
     TaskState.MUTATION_TESTING,
     TaskState.EVALUATING,
 }:
-    TRANSITIONS[(budgeted_state, TaskEvent.BUDGET_EXHAUSTED)] = TaskState.STOPPED
+    _TRANSITIONS[(budgeted_state, TaskEvent.BUDGET_EXHAUSTED)] = TaskState.STOPPED
+
+
+TRANSITIONS: Mapping[tuple[TaskState, TaskEvent], TaskState] = MappingProxyType(_TRANSITIONS)
