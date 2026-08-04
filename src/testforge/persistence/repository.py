@@ -3,9 +3,10 @@ from pathlib import Path
 from typing import Literal
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import event, select
 from sqlalchemy.engine import create_engine
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from testforge.domain.errors import InputError
 from testforge.domain.models import (
@@ -26,7 +27,17 @@ from testforge.persistence.schema import (
 
 class SQLiteTaskRepository:
     def __init__(self, path: Path) -> None:
-        self._engine = create_engine(f"sqlite+pysqlite:///{path}")
+        engine_options: dict[str, object] = {}
+        if str(path) == ":memory:":
+            engine_options = {
+                "connect_args": {"check_same_thread": False},
+                "poolclass": StaticPool,
+            }
+        self._engine = create_engine(
+            f"sqlite+pysqlite:///{path}",
+            **engine_options,
+        )
+        event.listen(self._engine, "connect", self._enable_foreign_keys)
         self._session_factory = sessionmaker(self._engine, expire_on_commit=False)
         Base.metadata.create_all(self._engine)
 
@@ -36,7 +47,10 @@ class SQLiteTaskRepository:
                 TaskRow(
                     id=str(task.id),
                     state=task.state.value,
-                    payload=task.model_dump(mode="json"),
+                    payload=task.model_dump(
+                        mode="json",
+                        exclude={"state", "baseline_metrics", "latest_metrics"},
+                    ),
                 )
             )
 
@@ -45,7 +59,19 @@ class SQLiteTaskRepository:
             row = session.get(TaskRow, str(task_id))
             if row is None:
                 raise InputError(f"task {task_id} does not exist")
-            return TaskRecord.model_validate({**row.payload, "state": row.state})
+            task_data = {**row.payload, "state": row.state}
+            for kind in ("baseline", "latest"):
+                metric = session.scalar(
+                    select(MetricRow.metric)
+                    .where(
+                        MetricRow.task_id == str(task_id),
+                        MetricRow.kind == kind,
+                    )
+                    .order_by(MetricRow.id.desc())
+                    .limit(1)
+                )
+                task_data[f"{kind}_metrics"] = metric
+            return TaskRecord.model_validate(task_data)
 
     def record_transition(
         self,
@@ -87,7 +113,7 @@ class SQLiteTaskRepository:
             raise InputError(f"metric kind {kind!r} is invalid")
 
         with self._session_factory.begin() as session:
-            row = self._require_task(session, task_id)
+            self._require_task(session, task_id)
             metric_payload = metric.model_dump(mode="json")
             session.add(
                 MetricRow(
@@ -96,9 +122,6 @@ class SQLiteTaskRepository:
                     metric=metric_payload,
                 )
             )
-            task_payload = dict(row.payload)
-            task_payload[f"{kind}_metrics"] = metric_payload
-            row.payload = task_payload
 
     def add_audit_event(self, event: AuditEvent) -> None:
         with self._session_factory.begin() as session:
@@ -139,10 +162,19 @@ class SQLiteTaskRepository:
 
     @staticmethod
     def _event_row(event: AuditEvent) -> AuditEventRow:
+        if event.occurred_at.tzinfo is None or event.occurred_at.utcoffset() is None:
+            raise InputError("audit event timestamp must be timezone-aware")
         return AuditEventRow(
             id=str(event.id),
             task_id=str(event.task_id),
             event_type=event.event_type,
             reason=event.reason,
-            occurred_at=event.occurred_at,
+            occurred_at=event.occurred_at.astimezone(UTC),
         )
+
+    @staticmethod
+    def _enable_foreign_keys(dbapi_connection, connection_record) -> None:
+        del connection_record
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()

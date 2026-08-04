@@ -1,6 +1,8 @@
 import json
 import sqlite3
-from datetime import UTC, datetime
+from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime, timedelta, timezone
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -83,6 +85,16 @@ def test_repository_resumes_persisted_task_and_events(tmp_path, sample_task):
     ] == ["started"]
 
 
+def test_in_memory_repository_is_shared_across_threads(sample_task):
+    repo = SQLiteTaskRepository(Path(":memory:"))
+    repo.create_task(sample_task)
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        resumed_task = executor.submit(repo.get_task, sample_task.id).result()
+
+    assert resumed_task == sample_task
+
+
 def test_add_attempt_appends_immutable_proposal_snapshot(tmp_path, sample_task):
     database = tmp_path / "testforge.db"
     repo = SQLiteTaskRepository(database)
@@ -158,6 +170,45 @@ def test_add_metric_rejects_invalid_kind_without_writing(tmp_path, sample_task):
         assert connection.execute("SELECT COUNT(*) FROM metrics").fetchone()[0] == 0
 
 
+def test_task_payload_is_an_immutable_snapshot_without_current_state_or_metrics(
+    tmp_path, sample_task
+):
+    database = tmp_path / "testforge.db"
+    repo = SQLiteTaskRepository(database)
+    repo.create_task(sample_task)
+    with sqlite3.connect(database) as connection:
+        original_payload = connection.execute("SELECT payload FROM tasks").fetchone()[0]
+
+    repo.record_transition(
+        sample_task.id,
+        TaskEvent.START,
+        TaskState.VALIDATING_INPUT,
+        "started",
+    )
+    repo.add_metric(
+        sample_task.id,
+        MetricSnapshot(
+            tests_passed=1,
+            tests_failed=0,
+            tests_skipped=0,
+            branch_coverage=100,
+            mutants_total=0,
+            mutants_killed=0,
+            mutants_survived=0,
+        ),
+        kind="latest",
+    )
+
+    with sqlite3.connect(database) as connection:
+        persisted_payload = connection.execute("SELECT payload FROM tasks").fetchone()[
+            0
+        ]
+    assert persisted_payload == original_payload
+    assert "state" not in json.loads(persisted_payload)
+    assert "baseline_metrics" not in json.loads(persisted_payload)
+    assert "latest_metrics" not in json.loads(persisted_payload)
+
+
 def test_add_audit_event_preserves_values_and_orders_ties_by_insertion(
     tmp_path, sample_task
 ):
@@ -181,6 +232,54 @@ def test_add_audit_event_preserves_values_and_orders_ties_by_insertion(
     repo.add_audit_event(second)
 
     assert repo.list_task_events(sample_task.id) == (first, second)
+
+
+def test_audit_events_are_normalized_and_ordered_by_absolute_time(
+    tmp_path, sample_task
+):
+    repo = SQLiteTaskRepository(tmp_path / "testforge.db")
+    repo.create_task(sample_task)
+    later = AuditEvent(
+        task_id=sample_task.id,
+        event_type="later",
+        reason="02:00 UTC",
+        occurred_at=datetime(2026, 1, 2, 2, tzinfo=UTC),
+    )
+    earlier = AuditEvent(
+        task_id=sample_task.id,
+        event_type="earlier",
+        reason="09:00 +08:00",
+        occurred_at=datetime(2026, 1, 2, 9, tzinfo=timezone(timedelta(hours=8))),
+    )
+
+    repo.add_audit_event(later)
+    repo.add_audit_event(earlier)
+
+    assert repo.list_task_events(sample_task.id) == (earlier, later)
+
+
+def test_add_audit_event_rejects_naive_timestamp_without_writing(tmp_path, sample_task):
+    repo = SQLiteTaskRepository(tmp_path / "testforge.db")
+    repo.create_task(sample_task)
+    event = AuditEvent(
+        task_id=sample_task.id,
+        event_type="naive",
+        reason="ambiguous time",
+        occurred_at=datetime(2026, 1, 2, 3, 4),  # noqa: DTZ001 - intentional naive input
+    )
+
+    with pytest.raises(InputError, match="timezone-aware"):
+        repo.add_audit_event(event)
+
+    assert repo.list_task_events(sample_task.id) == ()
+
+
+def test_sqlite_enforces_foreign_keys(tmp_path):
+    database = tmp_path / "testforge.db"
+    repo = SQLiteTaskRepository(database)
+
+    with repo._engine.connect() as connection:
+        assert connection.exec_driver_sql("PRAGMA foreign_keys").scalar_one() == 1
 
 
 @pytest.mark.parametrize(
