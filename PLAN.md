@@ -1268,7 +1268,7 @@ Commit: `git add src/testforge/tools tests/unit/tools tests/fixtures/tool_output
 - Consumes: `MetricSnapshot`, analyzer results, `QualityThreshold`, and attempt history.
 - Produces: `QualityDecision`, `QualityGate.evaluate`, and `FeedbackEngine.build`.
 
-- [ ] **Step 1: Write failing mutation-success and coverage-fallback tests**
+- [x] **Step 1: Write failing mutation-success and coverage-fallback tests**
 
 ```python
 def test_mutation_gate_requires_new_kill_and_five_points(gate):
@@ -1285,12 +1285,12 @@ def test_timeout_does_not_activate_coverage_fallback(gate):
     assert decision.reason == "mutation_tool_error"
 ```
 
-- [ ] **Step 2: Run quality tests to verify RED**
+- [x] **Step 2: Run quality tests to verify RED**
 
 Run: `python -m pytest tests/unit/feedback/test_quality_gate.py -v`  
 Expected: FAIL because `QualityGate` does not exist.
 
-- [ ] **Step 3: Implement ordered quality checks**
+- [x] **Step 3: Implement ordered quality checks**
 
 ```python
 class QualityGate:
@@ -1310,7 +1310,7 @@ class QualityGate:
         return QualityDecision.failed("mutation_tool_error")
 ```
 
-- [ ] **Step 4: Write RED/GREEN feedback packet and stagnation tests**
+- [x] **Step 4: Write RED/GREEN feedback packet and stagnation tests**
 
 ```python
 def test_surviving_mutant_feedback_names_mutant_and_changes_constraint(engine):
@@ -1342,7 +1342,7 @@ class FeedbackEngine:
         return FeedbackPacket(failure_category=category, surviving_mutants=surviving_mutants, constraints_for_next_attempt=constraints, stagnated=stagnated)
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit: `git add src/testforge/feedback tests/unit/feedback && git commit -m "feat: drive generation with quality feedback"`
 
@@ -1421,7 +1421,7 @@ def test_clear_is_project_scoped(memory):
 Run: `python -m pytest tests/unit/test_memory.py -v`  
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit: `git add src/testforge/memory.py src/testforge/persistence tests/unit/test_memory.py && git commit -m "feat: add bounded structured project memory"`
 
@@ -1662,7 +1662,7 @@ def test_audit_result_contains_hash_not_complete_source(dispatcher, source_reque
 Run: `python -m pytest tests/unit/tools -v`  
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit: `git add src/testforge/tools/dispatcher.py tests/unit/tools/test_dispatcher.py && git commit -m "feat: dispatch allowlisted test tools"`
 
@@ -1881,7 +1881,7 @@ def test_clear_missing_credential_is_idempotent(fake_keyring):
 Run: `python -m pytest tests/unit/test_credentials.py -v`  
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit: `git add src/testforge/credentials.py tests/unit/test_credentials.py && git commit -m "feat: manage API keys with OS keyring"`
 
@@ -1959,7 +1959,7 @@ def test_provider_errors_are_normalized_without_message(fake_openai, credential_
 Run: `python -m pytest tests/unit/llm -v`  
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit: `git add src/testforge/llm/openai_adapter.py tests/unit/llm/test_openai_adapter.py && git commit -m "feat: add OpenAI structured-output adapter"`
 
@@ -2052,7 +2052,7 @@ def test_reject_requires_valid_approval_uuid(cli_runner):
 Run: `python -m pytest tests/unit/test_cli.py -v`  
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit: `git add src/testforge/cli.py tests/unit/test_cli.py pyproject.toml && git commit -m "feat: expose TestForge CLI workflows"`
 
@@ -2132,7 +2132,7 @@ def test_task_page_uses_local_htmx_and_accessible_status(test_client, fake_app):
 Run: `python -m pytest tests/unit/web -v`  
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit: `git add src/testforge/web tests/unit/web && git commit -m "feat: add local task and approval WebUI"`
 
@@ -2222,7 +2222,7 @@ def test_weak_then_strong_demo_reaches_apply_approval_without_disk_write(demo_cl
 Run: `python -m pytest tests/unit/web/test_demo_mode.py tests/e2e/test_demo_flow.py -v`  
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit: `git add src/testforge/demo.py tests/fixtures/demo tests/unit/web/test_demo_mode.py tests/e2e/test_demo_flow.py && git commit -m "feat: add closed public mock demonstration"`
 
@@ -2290,7 +2290,7 @@ Expected: exit 0 and one JSON document containing `dangerous_action`, `feedback_
 Run: `python -m pytest tests/e2e/test_mechanism_demo.py -v`  
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit: `git add scripts/mechanism_demo.py tests/e2e/test_mechanism_demo.py && git commit -m "test: demonstrate deterministic harness mechanisms"`
 

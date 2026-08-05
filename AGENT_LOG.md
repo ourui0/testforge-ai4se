@@ -153,3 +153,14 @@
 - **评审**：只读评审 `/root/task07_reviewer` 的三个 Important（零字段、异常图泄漏、非枚举 outcome）和两个 Minor（类型强制、XML 命名空间）均判定 ADDRESSED，无新 Critical/Important，最终批准。
 - **人工修改**：无产品代码人工修改；控制器只固化用户批准契约、准备环境、生成审查包和更新证据。
 - **PR 状态**：本地独立分支/worktree 已评审并合入；远程仍未配置，真实 PR/MR 待平台确定后补充。
+
+## 2026-08-05 · TASK-008
+
+- **阶段/任务**：正式 Task 8，质量门槛与反馈分类。
+- **契约暂停与人工决定**：`MODEL_SWITCH_HANDOFF.md` §4 列出 10 个已知合同缺口，用户批准了推荐方向：`QualityDecision` 字段与 Literal、mutation_status 门控、zero-mutant 回退、timeout/error 独立语义、回归优先评测、`FailureSignal` 模型、9 类优先级表、current-vs-latest-prior 停滞比较。
+- **TDD**：首次 RED 为 `ModuleNotFoundError: testforge.feedback.quality_gate`（19 项测试）；`FeedbackEngine` 首次 RED 为 `ModuleNotFoundError: testforge.feedback.engine`（20 项测试）。
+- **提交/合并**：实现提交 `f996735`；Hermes 评审发现 1 Important（`_dominant_category` 忽略配置阈值）+ 4 Minor，修复提交 `1cf748d`；本地 PR 等价分支经 `--no-ff` 合入集成分支，merge commit `b1a7428`。
+- **验证**：初始 `209 passed, 3 skipped`；修复后 `214 passed, 3 skipped`（+5 项修复回归测试）。Ruff/格式检查通过。控制器合并后独立复跑 `214 passed, 3 skipped` 一致。
+- **评审**：独立只读评审 Hermes 发现 F1 [Important]（硬编码默认阈值）、F2 [Minor]（缺少 gate reason 回退映射）、F3 [Minor]（`_snap` 重复）、F4 [Minor]（`mutation_available` 重复）、F5 [Minor]（缺失 import_error/fixture_mock_error/flaky 测试）。所有发现经修复提交解决。用户跳过正式重审直接进入集成。
+- **人工修改**：无产品代码人工修改；控制器只固化合同审批、执行合并和更新证据。
+- **PR 状态**：本地独立分支/worktree 已评审并合入；远程仍未配置，真实 PR/MR 待平台确定后补充。
