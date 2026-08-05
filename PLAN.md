@@ -1016,7 +1016,27 @@ Commit: `git add src/testforge/governance src/testforge/persistence tests/unit/g
 
 **Interfaces:**
 - Consumes: `TestProposal`, `RefactorProposal`, `FeedbackPacket` from Task 2.
-- Produces: `GenerationContext`, `LLMClient` protocol, `LLMResponse`, and `MockLLMClient` with recorded calls.
+- Produces: immutable `GenerationContext`, `LLMCall`, `LLMClient` protocol, `LLMResponse`, and `MockLLMClient` with read-only recorded calls.
+
+The shared contract is:
+
+```python
+class GenerationContext(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    target_module: str = Field(min_length=1)
+    source: str
+    existing_tests: str
+    baseline: MetricSnapshot | None = None
+    constraints: tuple[str, ...] = ()
+    memory: tuple[str, ...] = ()
+
+class LLMCall(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    context: GenerationContext
+    feedback: FeedbackPacket | None = None
+```
+
+`LLMResponse` is frozen and contains exactly one of `test` or `refactor`. `MockLLMClient` copies the supplied response sequence into a tuple and exposes `calls` as a tuple, backed by a private mutable list. Every invocation records an immutable `LLMCall`, including an exhausted invocation; exhaustion does not advance the response index and always raises `LLMError("mock script exhausted")`. The first release follows the approved single-task sequential execution model and does not promise ordering for concurrent calls. Complete source is transient context only and must not be persisted to structured memory or audit logs.
 
 - [ ] **Step 1: Write the failing scripted-response test**
 
@@ -1062,12 +1082,16 @@ class LLMResponse(BaseModel):
 ```python
 class MockLLMClient:
     def __init__(self, responses: Sequence[LLMResponse]) -> None:
-        self.responses = tuple(responses)
-        self.calls: list[LLMCall] = []
+        self.responses: tuple[LLMResponse, ...] = tuple(responses)
+        self._calls: list[LLMCall] = []
         self._index = 0
 
+    @property
+    def calls(self) -> tuple[LLMCall, ...]:
+        return tuple(self._calls)
+
     def generate(self, context: GenerationContext, feedback: FeedbackPacket | None) -> LLMResponse:
-        self.calls.append(LLMCall(context=context, feedback=feedback))
+        self._calls.append(LLMCall(context=context, feedback=feedback))
         if self._index >= len(self.responses):
             raise LLMError("mock script exhausted")
         response = self.responses[self._index]
