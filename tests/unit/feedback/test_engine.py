@@ -4,34 +4,9 @@ import pytest
 from pydantic import ValidationError
 
 from testforge.config import QualityThreshold
-from testforge.domain.models import AttemptSummary, MetricSnapshot
 from testforge.feedback.engine import FailureSignal, FeedbackEngine
-
-# ── helpers ──────────────────────────────────────────────────────────
-
-def _snap(**overrides) -> MetricSnapshot:
-    defaults = {
-        "tests_passed": 50,
-        "tests_failed": 0,
-        "tests_skipped": 0,
-        "branch_coverage": 70.0,
-        "mutants_total": 20,
-        "mutants_killed": 10,
-        "mutants_survived": 10,
-        "mutation_status": "supported",
-    }
-    defaults.update(overrides)
-    return MetricSnapshot(**defaults)
-
-
-def _attempt(branch_coverage: float = 70.0, mutation_score: float = 50.0) -> AttemptSummary:
-    return AttemptSummary(branch_coverage=branch_coverage, mutation_score=mutation_score)
-
-
-@pytest.fixture
-def engine() -> FeedbackEngine:
-    return FeedbackEngine(QualityThreshold())
-
+from tests.unit.feedback.conftest import make_attempt as _attempt
+from tests.unit.feedback.conftest import make_snapshot as _snap
 
 # ── FailureSignal model ──────────────────────────────────────────────
 
@@ -160,6 +135,54 @@ def test_timeout_category(engine: FeedbackEngine) -> None:
     assert packet.failure_category == "timeout"
 
 
+def test_import_error_category(engine: FeedbackEngine) -> None:
+    """Import error is classified correctly."""
+    baseline = _snap(tests_passed=50, tests_failed=0)
+    candidate = _snap(tests_passed=10, tests_failed=0)
+    packet = engine.build(
+        baseline,
+        candidate,
+        candidate_failures=(
+            FailureSignal(category="import_error", summary="ModuleNotFoundError: numpy"),
+        ),
+    )
+    assert packet.failure_category == "import_error"
+    assert any("import" in c for c in packet.constraints_for_next_attempt)
+
+
+def test_fixture_mock_error_category(engine: FeedbackEngine) -> None:
+    """Fixture/mock error is classified correctly."""
+    baseline = _snap(tests_passed=50, tests_failed=0)
+    candidate = _snap(tests_passed=0, tests_failed=50)
+    packet = engine.build(
+        baseline,
+        candidate,
+        candidate_failures=(
+            FailureSignal(
+                category="fixture_mock_error",
+                summary="fixture 'db_connection' not found",
+            ),
+        ),
+    )
+    assert packet.failure_category == "fixture_mock_error"
+    assert any("fixture" in c for c in packet.constraints_for_next_attempt)
+
+
+def test_flaky_category(engine: FeedbackEngine) -> None:
+    """Flaky test is classified correctly."""
+    baseline = _snap()
+    candidate = _snap()
+    packet = engine.build(
+        baseline,
+        candidate,
+        candidate_failures=(
+            FailureSignal(category="flaky", summary="test passed on retry"),
+        ),
+    )
+    assert packet.failure_category == "flaky"
+    assert any("flaky" in c or "stabilis" in c for c in packet.constraints_for_next_attempt)
+
+
 def test_threshold_missed_fallback(engine: FeedbackEngine) -> None:
     """When no other signal, generic threshold-missed is used."""
     baseline = _snap(mutants_total=20, mutants_killed=10, mutants_survived=10)
@@ -277,3 +300,37 @@ def test_one_prior_equal_to_candidate_is_stagnated(engine: FeedbackEngine) -> No
     prior = [_attempt(branch_coverage=70.0, mutation_score=50.0)]
     packet = engine.build(baseline, candidate, prior_attempts=prior)
     assert packet.stagnated is True
+
+
+# ── F1 regression: engine respects configured thresholds ─────────────
+
+def test_engine_uses_configured_not_default_threshold() -> None:
+    """F1: _dominant_category must use self._gate, not QualityGate(QualityThreshold())."""
+    strict_engine = FeedbackEngine(
+        QualityThreshold(coverage_delta_points=10.0, coverage_target_percent=95.0)
+    )
+    baseline = _snap(branch_coverage=70, mutation_status="unsupported")
+    candidate = _snap(branch_coverage=76, mutation_status="unsupported")  # delta=6
+
+    # strict gate: delta 6 < threshold 10 and 76 < target 95 → no_improvement
+    packet = strict_engine.build(baseline, candidate)
+    # With the bug, the default gate (delta=5) sees 6 >= 5 → coverage_improved,
+    # so the engine never enters the no_improvement branch and returns
+    # threshold_missed instead of coverage_not_improved.
+    assert packet.failure_category == "coverage_not_improved"
+
+
+def test_engine_respects_coverage_target() -> None:
+    """F1: engine with low delta but high target crossing should classify correctly."""
+    strict_engine = FeedbackEngine(
+        QualityThreshold(coverage_delta_points=10.0, coverage_target_percent=90.0)
+    )
+    baseline = _snap(branch_coverage=85, mutation_status="unsupported")
+    candidate = _snap(branch_coverage=91, mutation_status="unsupported")  # delta=6 < 10 but crosses 90 target
+
+    # strict gate: 91 >= target 90 → coverage_improved (passes gate)
+    # Since gate passes, no no_improvement → surviving_mutant or threshold
+    # But no surviving mutants and no failures → threshold_missed
+    packet = strict_engine.build(baseline, candidate)
+    # Gate passes → no no_improvement, no surviving_mutants, no failures → threshold_missed
+    assert packet.failure_category == "threshold_missed"

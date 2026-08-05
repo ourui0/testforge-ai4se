@@ -3,42 +3,8 @@
 import pytest
 from pydantic import ValidationError
 
-from testforge.config import QualityThreshold
-from testforge.domain.models import MetricSnapshot
 from testforge.feedback.quality_gate import QualityDecision, QualityGate
-
-# ── helpers ──────────────────────────────────────────────────────────
-
-def _snap(**overrides) -> MetricSnapshot:
-    defaults = {
-        "tests_passed": 50,
-        "tests_failed": 0,
-        "tests_skipped": 0,
-        "branch_coverage": 70.0,
-        "mutants_total": 20,
-        "mutants_killed": 10,
-        "mutants_survived": 10,
-        "mutation_status": "supported",
-    }
-    defaults.update(overrides)
-    return MetricSnapshot(**defaults)
-
-
-@pytest.fixture
-def gate() -> QualityGate:
-    return QualityGate(QualityThreshold())
-
-
-@pytest.fixture
-def strict_gate() -> QualityGate:
-    return QualityGate(
-        QualityThreshold(
-            mutation_delta_points=0.0,
-            coverage_delta_points=0.0,
-            coverage_target_percent=100.0,
-        )
-    )
-
+from tests.unit.feedback.conftest import make_snapshot as _snap
 
 # ── mutation-gate tests (from brief) ─────────────────────────────────
 

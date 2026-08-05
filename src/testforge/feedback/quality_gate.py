@@ -8,6 +8,11 @@ from testforge.config import QualityThreshold
 from testforge.domain.models import MetricSnapshot
 
 
+def is_mutation_available(snapshot: MetricSnapshot) -> bool:
+    """Return True when valid mutation data is available for gating."""
+    return snapshot.mutation_status == "supported" and snapshot.mutants_total > 0
+
+
 class QualityDecision(BaseModel):
     """Immutable pass/fail decision with a fixed reason."""
 
@@ -60,11 +65,7 @@ class QualityGate:
             return QualityDecision(passed=False, reason="mutation_tool_error")
 
         # 4. Determine whether valid mutation data is available
-        mutation_available = (
-            candidate.mutation_status == "supported" and candidate.mutants_total > 0
-        )
-
-        if mutation_available:
+        if is_mutation_available(candidate):
             return self._evaluate_mutation(baseline, candidate)
 
         # 5. Coverage fallback (unsupported or zero valid mutants)

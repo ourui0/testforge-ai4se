@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from testforge.config import QualityThreshold
 from testforge.domain.models import AttemptSummary, FeedbackPacket, MetricSnapshot
-from testforge.feedback.quality_gate import QualityGate
+from testforge.feedback.quality_gate import QualityGate, is_mutation_available
 
 # ── category precedence (lower = higher priority) ────────────────────
 
@@ -23,6 +23,14 @@ _CATEGORY_PRECEDENCE: dict[str, int] = {
 }
 
 _ALL_CATEGORIES = tuple(_CATEGORY_PRECEDENCE.keys())
+
+# ── gate reason → fallback category (F2) ────────────────────────────
+
+_GATE_REASON_CATEGORY: dict[str, str] = {
+    "test_regression": "assertion_failure",
+    "metric_regression": "threshold_missed",
+    "mutation_tool_error": "timeout",
+}
 
 # ── models ───────────────────────────────────────────────────────────
 
@@ -117,8 +125,8 @@ class FeedbackEngine:
 
     # ── internal ──────────────────────────────────────────────────
 
-    @staticmethod
     def _dominant_category(
+        self,
         baseline: MetricSnapshot,
         candidate: MetricSnapshot,
         surviving_mutants: tuple[str, ...],
@@ -141,15 +149,11 @@ class FeedbackEngine:
                 best_priority = pri
                 best_category = "surviving_mutant"
 
-        # Coverage / threshold fallback from gate evaluation
-        decision = QualityGate(QualityThreshold()).evaluate(baseline, candidate)
+        # Gate evaluation using the configured threshold (F1: use self._gate)
+        decision = self._gate.evaluate(baseline, candidate)
+
         if decision.reason == "no_improvement":
-            # Determine if this is coverage-not-improved or threshold-missed
-            mutation_available = (
-                candidate.mutation_status == "supported"
-                and candidate.mutants_total > 0
-            )
-            if not mutation_available:
+            if not is_mutation_available(candidate):
                 pri = _CATEGORY_PRECEDENCE["coverage_not_improved"]
                 if pri < best_priority:
                     best_category = "coverage_not_improved"
@@ -157,6 +161,11 @@ class FeedbackEngine:
                 pri = _CATEGORY_PRECEDENCE["threshold_missed"]
                 if pri < best_priority:
                     best_category = "threshold_missed"
+        elif decision.reason in _GATE_REASON_CATEGORY:  # F2
+            fallback = _GATE_REASON_CATEGORY[decision.reason]
+            pri = _CATEGORY_PRECEDENCE.get(fallback, 999)
+            if pri < best_priority:
+                best_category = fallback
 
         return best_category
 
