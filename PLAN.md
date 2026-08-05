@@ -1008,6 +1008,8 @@ Commit: `git add src/testforge/governance src/testforge/persistence tests/unit/g
 
 ### Task 6: Provider-Neutral LLM Contract and Scripted Mock
 
+> **Formal completion:** implementer `/root/task06_implementer`; task commit `3e1f6e3`; integration merge `42f1dba`; initial and extended RED evidence captured; focused suite `7 passed`, full suite `118 passed, 3 skipped`; independent review approved with no findings and controller verification passed.
+
 **Files:**
 - Create: `src/testforge/llm/__init__.py`
 - Create: `src/testforge/llm/protocol.py`
@@ -1038,7 +1040,7 @@ class LLMCall(BaseModel):
 
 `LLMResponse` is frozen and contains exactly one of `test` or `refactor`. `MockLLMClient` copies the supplied response sequence into a tuple and exposes `calls` as a tuple, backed by a private mutable list. Every invocation records an immutable `LLMCall`, including an exhausted invocation; exhaustion does not advance the response index and always raises `LLMError("mock script exhausted")`. The first release follows the approved single-task sequential execution model and does not promise ordering for concurrent calls. Complete source is transient context only and must not be persisted to structured memory or audit logs.
 
-- [ ] **Step 1: Write the failing scripted-response test**
+- [x] **Step 1: Write the failing scripted-response test**
 
 ```python
 def test_mock_returns_script_in_order_and_records_feedback():
@@ -1050,12 +1052,12 @@ def test_mock_returns_script_in_order_and_records_feedback():
     assert client.calls[1].feedback.failure_category == "surviving_mutant"
 ```
 
-- [ ] **Step 2: Run mock test to verify RED**
+- [x] **Step 2: Run mock test to verify RED**
 
 Run: `python -m pytest tests/unit/llm/test_mock.py -v`  
 Expected: FAIL because LLM modules do not exist.
 
-- [ ] **Step 3: Implement protocol and discriminated response schema**
+- [x] **Step 3: Implement protocol and discriminated response schema**
 
 ```python
 class LLMClient(Protocol):
@@ -1075,7 +1077,7 @@ class LLMResponse(BaseModel):
         return self
 ```
 
-- [ ] **Step 4: Implement exhausted-script and immutability cases**
+- [x] **Step 4: Implement exhausted-script and immutability cases**
 
 `MockLLMClient.generate` pops no data; it advances an index, records immutable call snapshots, and raises `LLMError("mock script exhausted")` after the last response. Run `python -m pytest tests/unit/llm -v`. Expected: PASS.
 
@@ -1099,7 +1101,7 @@ class MockLLMClient:
         return response
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit: `git add src/testforge/llm tests/unit/llm && git commit -m "feat: add provider-neutral scripted LLM"`
 
