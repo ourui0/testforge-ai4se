@@ -65,3 +65,19 @@ class ApprovalRow(Base):
     )
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class MemoryEntryRow(Base):
+    __tablename__ = "memory_entries"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    project_id: Mapped[str] = mapped_column(String(256), nullable=False, index=True)
+    kind: Mapped[str] = mapped_column(String(48), nullable=False)
+    tags: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    summary: Mapped[str] = mapped_column(String(2000), nullable=False)
+    source_task_id: Mapped[str | None] = mapped_column(String(36))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    version: Mapped[int] = mapped_column(nullable=False, default=1)
