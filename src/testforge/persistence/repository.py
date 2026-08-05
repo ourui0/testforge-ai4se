@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 from uuid import UUID
 
 from sqlalchemy import event, select, update
@@ -10,6 +12,10 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from testforge.domain.errors import InputError
+
+if TYPE_CHECKING:
+    from testforge.memory import MemoryEntry
+
 from testforge.domain.models import (
     ApprovalRequest,
     ApprovalStatus,
@@ -24,6 +30,7 @@ from testforge.persistence.schema import (
     AttemptRow,
     AuditEventRow,
     Base,
+    MemoryEntryRow,
     MetricRow,
     TaskRow,
 )
@@ -217,6 +224,85 @@ class SQLiteTaskRepository:
                 )
                 for row in session.scalars(statement)
             )
+
+    # ── memory ────────────────────────────────────────────────────
+
+    def add_memory(self, entry: MemoryEntry) -> None:
+        with self._session_factory.begin() as session:
+            session.add(
+                MemoryEntryRow(
+                    id=str(entry.id),
+                    project_id=entry.project_id,
+                    kind=entry.kind,
+                    tags=list(entry.tags),
+                    summary=entry.summary,
+                    source_task_id=(
+                        str(entry.source_task_id)
+                        if entry.source_task_id
+                        else None
+                    ),
+                    created_at=entry.created_at,
+                    expires_at=entry.expires_at,
+                    version=entry.version,
+                )
+            )
+
+    def find_memory(
+        self, project_id: str, active_at: datetime
+    ) -> tuple[MemoryEntry, ...]:
+        with self._session_factory() as session:
+            rows = (
+                session.query(MemoryEntryRow)
+                .filter(
+                    MemoryEntryRow.project_id == project_id,
+                    (
+                        MemoryEntryRow.expires_at.is_(None)
+                        | (MemoryEntryRow.expires_at > active_at)
+                    ),
+                )
+                .order_by(
+                    MemoryEntryRow.created_at.desc(),
+                    MemoryEntryRow.version.desc(),
+                    MemoryEntryRow.id.desc(),
+                )
+                .all()
+            )
+            from testforge.memory import MemoryEntry as ME
+
+            return tuple(
+                ME(
+                    id=row.id,
+                    project_id=row.project_id,
+                    kind=row.kind,
+                    tags=tuple(row.tags) if isinstance(row.tags, list) else (),
+                    summary=row.summary,
+                    source_task_id=row.source_task_id,
+                    created_at=row.created_at,
+                    expires_at=row.expires_at,
+                    version=row.version,
+                )
+                for row in rows
+            )
+
+    def trim_memory(self, project_id: str, maximum: int) -> None:
+        with self._session_factory.begin() as session:
+            rows = (
+                session.query(MemoryEntryRow)
+                .filter(MemoryEntryRow.project_id == project_id)
+                .order_by(MemoryEntryRow.created_at.desc())
+                .offset(maximum)
+                .all()
+            )
+            for row in rows:
+                session.delete(row)
+
+    def clear_project_memory(self, project_id: str) -> None:
+        with self._session_factory.begin() as session:
+            session.query(MemoryEntryRow).filter(
+                MemoryEntryRow.project_id == project_id
+            ).delete()
+
+    # ── private ────────────────────────────────────────────────────
 
     def _insert_event(self, session: Session, row: AuditEventRow) -> None:
         session.add(row)
