@@ -1120,7 +1120,48 @@ Commit: `git add src/testforge/llm tests/unit/llm && git commit -m "feat: add pr
 
 **Interfaces:**
 - Consumes: `MetricSnapshot`, `ToolExecutionError`.
-- Produces: `CommandResult`, `PytestResult`, `CoverageResult`, `MutationResult`, `parse_pytest_json`, `parse_coverage_json`, `parse_mutmut_junit`, and `metric_snapshot_from_results`.
+- Produces: immutable `CommandResult`, `PytestResult`, `CoverageResult`, `MutationResult`, `MutationRunOutcome`, strict parser functions, and `metric_snapshot_from_results`.
+
+The public result contract is:
+
+```python
+class CommandResult(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    exit_code: int
+    stdout: str = ""
+    stderr: str = ""
+    def diagnostic_summary(self, workspace_root: Path | None = None) -> str: ...
+
+class PytestResult(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    passed: int = Field(ge=0)
+    failed: int = Field(ge=0)
+    skipped: int = Field(ge=0)
+    errors: int = Field(default=0, ge=0)
+
+class CoverageResult(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    branch_percent: float = Field(ge=0, le=100)
+    missing_lines: tuple[int, ...] = ()
+    missing_branches: tuple[tuple[int, int], ...] = ()
+
+class MutationRunOutcome(StrEnum):
+    COMPLETED = "completed"
+    UNSUPPORTED = "unsupported"
+    TIMEOUT = "timeout"
+
+class MutationResult(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    supported: bool
+    total: int = Field(ge=0)
+    killed: int = Field(ge=0)
+    survived: int = Field(ge=0)
+    errors: int = Field(ge=0)
+```
+
+For supported mutation results, `total == killed + survived + errors`; unsupported results require every count to be zero. `parse_mutmut_junit(raw, outcome=MutationRunOutcome.COMPLETED)` returns the zero unsupported result only for explicit `UNSUPPORTED`, raises `ToolExecutionError("mutation tool timed out")` for `TIMEOUT`, and parses XML only for `COMPLETED`. Pytest/coverage parsers accept only their documented machine fields and raise stable errors without embedding raw input. `metric_snapshot_from_results` adds pytest `errors` to `tests_failed`; unsupported mutation maps to `mutation_status="unsupported"`, while timeout never masquerades as unsupported.
+
+`CommandResult.diagnostic_summary` owns redaction. It leaves raw `stdout`/`stderr` unchanged, case-insensitively replaces the supplied workspace root in native, slash, and backslash forms with `<workspace>`, replaces case-sensitive tokens matching `sk-[A-Za-z0-9_-]+` with `<redacted>`, and performs all redaction before truncation. It retains at most 2000 redacted characters from each stream and appends `…<truncated>` when truncated. Its deterministic format includes exit code plus labeled stdout/stderr sections and never raises due to a missing workspace root.
 
 - [ ] **Step 1: Write failing fixture parser tests**
 
@@ -1167,7 +1208,14 @@ def parse_pytest_json(raw: str) -> PytestResult:
         raise ToolExecutionError("invalid pytest JSON") from exc
 
 
-def parse_mutmut_junit(raw: str) -> MutationResult:
+def parse_mutmut_junit(
+    raw: str,
+    outcome: MutationRunOutcome = MutationRunOutcome.COMPLETED,
+) -> MutationResult:
+    if outcome is MutationRunOutcome.UNSUPPORTED:
+        return MutationResult(supported=False, total=0, killed=0, survived=0, errors=0)
+    if outcome is MutationRunOutcome.TIMEOUT:
+        raise ToolExecutionError("mutation tool timed out")
     try:
         root = ElementTree.fromstring(raw)
         cases = root.findall(".//testcase")
@@ -1182,7 +1230,7 @@ def parse_mutmut_junit(raw: str) -> MutationResult:
 def metric_snapshot_from_results(pytest_result: PytestResult, coverage_result: CoverageResult, mutation_result: MutationResult) -> MetricSnapshot:
     return MetricSnapshot(
         tests_passed=pytest_result.passed,
-        tests_failed=pytest_result.failed,
+        tests_failed=pytest_result.failed + pytest_result.errors,
         tests_skipped=pytest_result.skipped,
         branch_coverage=coverage_result.branch_percent,
         mutants_total=mutation_result.total,
