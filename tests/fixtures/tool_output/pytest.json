@@ -1,0 +1,12 @@
+{
+  "created": 1785888000.0,
+  "duration": 0.12,
+  "exitcode": 0,
+  "root": "/workspace",
+  "summary": {
+    "passed": 8,
+    "failed": 0,
+    "skipped": 0,
+    "total": 8
+  }
+}
