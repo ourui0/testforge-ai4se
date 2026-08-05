@@ -1360,7 +1360,7 @@ Commit: `git add src/testforge/feedback tests/unit/feedback && git commit -m "fe
 - Consumes: persisted `MemoryEntry` records and current target/failure tags.
 - Produces: `ProjectMemory.remember`, `select`, `list_entries`, and `clear_project`.
 
-- [ ] **Step 1: Write failing project-isolation and bounded-selection tests**
+- [x] **Step 1: Write failing project-isolation and bounded-selection tests**
 
 ```python
 def test_memory_selects_only_same_project_matching_tags(memory):
@@ -1374,12 +1374,12 @@ def test_memory_rejects_source_or_secret_shaped_content(memory):
         memory.remember("project-a", kind="strategy", tags=(), summary="sk-secret-value")
 ```
 
-- [ ] **Step 2: Run memory tests to verify RED**
+- [x] **Step 2: Run memory tests to verify RED**
 
 Run: `python -m pytest tests/unit/test_memory.py -v`  
 Expected: FAIL because `ProjectMemory` does not exist.
 
-- [ ] **Step 3: Implement deterministic tagged selection**
+- [x] **Step 3: Implement deterministic tagged selection**
 
 ```python
 class ProjectMemory:
@@ -1398,7 +1398,7 @@ class ProjectMemory:
 
 Reject summaries over 2,000 characters, secret-like patterns, and payloads marked as complete source or complete prompt.
 
-- [ ] **Step 4: Add expiry, version, clear, and capacity tests**
+- [x] **Step 4: Add expiry, version, clear, and capacity tests**
 
 Assert expired records are excluded, newer versions supersede older entries with the same key, `clear_project` removes only that project, and at most 500 active entries remain after insertion.
 

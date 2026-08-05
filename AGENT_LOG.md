@@ -164,3 +164,13 @@
 - **评审**：独立只读评审 Hermes 发现 F1 [Important]（硬编码默认阈值）、F2 [Minor]（缺少 gate reason 回退映射）、F3 [Minor]（`_snap` 重复）、F4 [Minor]（`mutation_available` 重复）、F5 [Minor]（缺失 import_error/fixture_mock_error/flaky 测试）。所有发现经修复提交解决。用户跳过正式重审直接进入集成。
 - **人工修改**：无产品代码人工修改；控制器只固化合同审批、执行合并和更新证据。
 - **PR 状态**：本地独立分支/worktree 已评审并合入；远程仍未配置，真实 PR/MR 待平台确定后补充。
+## 2026-08-05 · TASK-009
+
+- **阶段/任务**：正式 Task 9，结构化项目记忆。
+- **契约暂停与人工决定**：无。MemoryEntry 字段、容量限制（500）、过期语义、标签匹配排序、项目隔离和 secret 拒绝均在 PLAN 中明确定义。
+- **TDD**：首次 RED 为 `ModuleNotFoundError: testforge.memory`（10 项测试）。GREEN 后扩展至 16 项测试（新增 expiry、capacity、clear、recency ordering）。
+- **提交/合并**：实现提交 `527b734`；本地 PR 等价分支经 `--no-ff` 合入集成分支。
+- **验证**：`230 passed, 3 skipped`（+16 memory 测试）。Ruff/格式检查通过。
+- **评审**：本轮未派发独立 Hermes 审查。核心自检通过：项目隔离、标签排序、过期排除、容量裁剪、secret 拒绝、跨项目清除隔离。
+- **人工修改**：无。
+- **PR 状态**：本地已合入；远程仍未配置。

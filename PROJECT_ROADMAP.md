@@ -1,6 +1,6 @@
 # AI4SE A 类项目总体规划表
 
-> 当前阶段：正式 Task 1–8 已完成。Task 8（反馈引擎与质量门槛）已通过实现（Claude）、独立评审（Hermes）、修复和集成验证，`214 passed, 3 skipped`。正在准备 Task 9（结构化项目记忆）。
+> 当前阶段：正式 Task 1–9 已完成。Task 9（结构化项目记忆）已通过实现和集成验证，`230 passed, 3 skipped`。正在准备 Task 10（Docker 沙箱）。
 
 ## 已选选题
 
