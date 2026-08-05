@@ -3,7 +3,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Self
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 _DIAGNOSTIC_STREAM_LIMIT = 2000
 _TRUNCATION_MARKER = "…<truncated>"
@@ -11,7 +11,7 @@ _SECRET_PATTERN = re.compile(r"sk-[A-Za-z0-9_-]+")
 
 
 class CommandResult(BaseModel):
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, strict=True)
 
     exit_code: int
     stdout: str = ""
@@ -24,7 +24,7 @@ class CommandResult(BaseModel):
 
 
 class PytestResult(BaseModel):
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, strict=True)
 
     passed: int = Field(ge=0)
     failed: int = Field(ge=0)
@@ -33,11 +33,18 @@ class PytestResult(BaseModel):
 
 
 class CoverageResult(BaseModel):
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, strict=True)
 
-    branch_percent: float = Field(ge=0, le=100)
+    branch_percent: float = Field(ge=0, le=100, allow_inf_nan=False)
     missing_lines: tuple[int, ...] = ()
     missing_branches: tuple[tuple[int, int], ...] = ()
+
+    @field_validator("branch_percent", mode="before")
+    @classmethod
+    def normalize_branch_percent(cls, value: object) -> object:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError("branch percent must be numeric")  # noqa: TRY004
+        return float(value)
 
 
 class MutationRunOutcome(StrEnum):
@@ -47,7 +54,7 @@ class MutationRunOutcome(StrEnum):
 
 
 class MutationResult(BaseModel):
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, strict=True)
 
     supported: bool
     total: int = Field(ge=0)

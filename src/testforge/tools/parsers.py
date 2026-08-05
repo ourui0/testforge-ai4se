@@ -23,10 +23,11 @@ def parse_pytest_json(raw: str) -> PytestResult:
             passed=_count(summary, "passed"),
             failed=_count(summary, "failed"),
             skipped=_count(summary, "skipped"),
-            errors=_count(summary, "error", default=0),
+            errors=_count(summary, "error"),
         )
-    except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
-        raise ToolExecutionError("invalid pytest JSON") from exc
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+        pass
+    raise ToolExecutionError("invalid pytest JSON")
 
 
 def parse_coverage_json(raw: str, target: str) -> CoverageResult:
@@ -56,14 +57,17 @@ def parse_coverage_json(raw: str, target: str) -> CoverageResult:
             missing_lines=missing_lines,
             missing_branches=missing_branches,
         )
-    except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
-        raise ToolExecutionError("invalid coverage JSON") from exc
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+        pass
+    raise ToolExecutionError("invalid coverage JSON")
 
 
 def parse_mutmut_junit(
     raw: str,
     outcome: MutationRunOutcome = MutationRunOutcome.COMPLETED,
 ) -> MutationResult:
+    if not isinstance(outcome, MutationRunOutcome):
+        raise ToolExecutionError("invalid mutation run outcome")
     if outcome is MutationRunOutcome.UNSUPPORTED:
         return MutationResult(supported=False, total=0, killed=0, survived=0, errors=0)
     if outcome is MutationRunOutcome.TIMEOUT:
@@ -73,7 +77,9 @@ def parse_mutmut_junit(
         root = ElementTree.fromstring(raw)
         if _local_name(root.tag) not in {"testsuite", "testsuites"}:
             raise ValueError
-        cases = root.findall(".//testcase")
+        cases = [
+            element for element in root.iter() if _local_name(element.tag) == "testcase"
+        ]
         if not cases:
             raise ValueError
 
@@ -81,9 +87,10 @@ def parse_mutmut_junit(
         survived = 0
         errors = 0
         for case in cases:
-            if case.find("error") is not None:
+            child_names = {_local_name(child.tag) for child in case}
+            if "error" in child_names:
                 errors += 1
-            elif case.find("failure") is not None:
+            elif "failure" in child_names:
                 killed += 1
             else:
                 survived += 1
@@ -94,8 +101,9 @@ def parse_mutmut_junit(
             survived=survived,
             errors=errors,
         )
-    except (ElementTree.ParseError, TypeError, ValueError) as exc:
-        raise ToolExecutionError("invalid mutmut JUnit XML") from exc
+    except (ElementTree.ParseError, TypeError, ValueError):
+        pass
+    raise ToolExecutionError("invalid mutmut JUnit XML")
 
 
 def metric_snapshot_from_results(
@@ -124,11 +132,9 @@ def _json_object(raw: str) -> dict[str, Any]:
     return payload
 
 
-def _count(values: dict[str, Any], key: str, default: int | None = None) -> int:
+def _count(values: dict[str, Any], key: str) -> int:
     if key not in values:
-        if default is None:
-            raise KeyError(key)
-        return default
+        return 0
     value = values[key]
     if type(value) is not int or value < 0:
         raise TypeError
@@ -156,5 +162,5 @@ def _branch_list(value: Any) -> tuple[tuple[int, int], ...]:
     return tuple(branches)
 
 
-def _local_name(tag: str) -> str:
-    return tag.rsplit("}", 1)[-1]
+def _local_name(tag: object) -> str:
+    return tag.rsplit("}", 1)[-1] if isinstance(tag, str) else ""

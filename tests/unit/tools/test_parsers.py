@@ -11,7 +11,13 @@ from testforge.tools.parsers import (
     parse_mutmut_junit,
     parse_pytest_json,
 )
-from testforge.tools.results import CommandResult, MutationResult, MutationRunOutcome
+from testforge.tools.results import (
+    CommandResult,
+    CoverageResult,
+    MutationResult,
+    MutationRunOutcome,
+    PytestResult,
+)
 
 FIXTURE_DIRECTORY = Path(__file__).parents[2] / "fixtures" / "tool_output"
 
@@ -48,7 +54,7 @@ def test_parse_tools_into_one_metric_snapshot(fixture_text):
     [
         ('{"summary":{"passed":"8","failed":0,"skipped":0}}', "invalid pytest JSON"),
         ('{"summary":{"passed":true,"failed":0,"skipped":0}}', "invalid pytest JSON"),
-        ('{"summary":{"passed":8,"failed":0}}', "invalid pytest JSON"),
+        ('{"summary":{"passed":8,"skipped":"0"}}', "invalid pytest JSON"),
         ('{"summary":[]}', "invalid pytest JSON"),
         ("not JSON and sk-secret", "invalid pytest JSON"),
     ],
@@ -77,6 +83,12 @@ def test_pytest_parser_folds_errors_into_failed_metric():
     )
 
     assert snapshot.tests_failed == 5
+
+
+def test_pytest_parser_defaults_absent_outcome_counts_to_zero():
+    result = parse_pytest_json('{"summary":{"collected":0,"total":0}}')
+
+    assert result == PytestResult(passed=0, failed=0, skipped=0, errors=0)
 
 
 def test_coverage_parser_preserves_missing_lines_and_branches():
@@ -151,6 +163,24 @@ def test_mutmut_parser_classifies_errors_separately_from_killed_and_survived():
     )
 
     assert (result.total, result.killed, result.survived, result.errors) == (3, 1, 1, 1)
+
+
+def test_mutmut_parser_classifies_default_namespaced_junit(fixture_text):
+    result = parse_mutmut_junit(fixture_text("mutmut-namespaced.xml"))
+
+    assert (result.total, result.killed, result.survived, result.errors) == (3, 1, 1, 1)
+
+
+@pytest.mark.parametrize("outcome", ["completed", "unsupported", "timeout", None, 1])
+def test_mutmut_parser_rejects_non_enum_outcomes_without_parsing_xml(outcome):
+    valid_xml = "<testsuite><testcase /></testsuite>"
+
+    with pytest.raises(ToolExecutionError) as caught:
+        parse_mutmut_junit(valid_xml, outcome=outcome)
+
+    assert str(caught.value) == "invalid mutation run outcome"
+    assert caught.value.__cause__ is None
+    assert caught.value.__context__ is None
 
 
 @pytest.mark.parametrize("raw", ["not XML and sk-secret", "<testsuite />"])
@@ -238,3 +268,61 @@ def test_command_diagnostic_truncates_each_redacted_stream_deterministically():
         + "b" * 2000
         + "…<truncated>"
     )
+
+
+@pytest.mark.parametrize(
+    ("parse", "raw", "message"),
+    [
+        (parse_pytest_json, "not JSON sk-secret", "invalid pytest JSON"),
+        (
+            lambda raw: parse_coverage_json(raw, target="src/calc.py"),
+            "not JSON sk-secret",
+            "invalid coverage JSON",
+        ),
+        (parse_mutmut_junit, "<sk-secret>", "invalid mutmut JUnit XML"),
+    ],
+)
+def test_parser_errors_discard_raw_bearing_exception_graph(parse, raw, message):
+    with pytest.raises(ToolExecutionError) as caught:
+        parse(raw)
+
+    assert str(caught.value) == message
+    assert caught.value.__cause__ is None
+    assert caught.value.__context__ is None
+    assert "sk-secret" not in repr(caught.value)
+
+
+@pytest.mark.parametrize(
+    "build",
+    [
+        lambda: CommandResult(exit_code=True),
+        lambda: CommandResult(exit_code="0"),
+        lambda: CommandResult(exit_code=0, stdout=1),
+        lambda: PytestResult(passed=True, failed=0, skipped=0),
+        lambda: PytestResult(passed="1", failed=0, skipped=0),
+        lambda: CoverageResult(branch_percent="75"),
+        lambda: CoverageResult(branch_percent=True),
+        lambda: MutationResult(
+            supported="true", total=0, killed=0, survived=0, errors=0
+        ),
+        lambda: MutationResult(
+            supported=True, total="0", killed=0, survived=0, errors=0
+        ),
+    ],
+)
+def test_public_result_models_reject_coercive_fact_values(build):
+    with pytest.raises(ValidationError):
+        build()
+
+
+@pytest.mark.parametrize("branch_percent", [0, 75, 75.5, 100])
+def test_coverage_result_accepts_finite_numeric_percentages(branch_percent):
+    result = CoverageResult(branch_percent=branch_percent)
+
+    assert result.branch_percent == float(branch_percent)
+
+
+@pytest.mark.parametrize("branch_percent", [float("nan"), float("inf"), -float("inf")])
+def test_coverage_result_rejects_non_finite_percentages(branch_percent):
+    with pytest.raises(ValidationError):
+        CoverageResult(branch_percent=branch_percent)

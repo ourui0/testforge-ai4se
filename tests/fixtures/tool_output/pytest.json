@@ -5,8 +5,33 @@
   "root": "/workspace",
   "summary": {
     "passed": 8,
-    "failed": 0,
-    "skipped": 0,
+    "collected": 8,
     "total": 8
-  }
+  },
+  "collectors": [
+    {
+      "nodeid": "tests/test_calc.py",
+      "outcome": "passed",
+      "result": [
+        {"nodeid": "tests/test_calc.py::test_case_1", "type": "Function", "lineno": 0},
+        {"nodeid": "tests/test_calc.py::test_case_2", "type": "Function", "lineno": 4},
+        {"nodeid": "tests/test_calc.py::test_case_3", "type": "Function", "lineno": 8},
+        {"nodeid": "tests/test_calc.py::test_case_4", "type": "Function", "lineno": 12},
+        {"nodeid": "tests/test_calc.py::test_case_5", "type": "Function", "lineno": 16},
+        {"nodeid": "tests/test_calc.py::test_case_6", "type": "Function", "lineno": 20},
+        {"nodeid": "tests/test_calc.py::test_case_7", "type": "Function", "lineno": 24},
+        {"nodeid": "tests/test_calc.py::test_case_8", "type": "Function", "lineno": 28}
+      ]
+    }
+  ],
+  "tests": [
+    {"nodeid": "tests/test_calc.py::test_case_1", "lineno": 0, "outcome": "passed", "call": {"duration": 0.01, "outcome": "passed"}},
+    {"nodeid": "tests/test_calc.py::test_case_2", "lineno": 4, "outcome": "passed", "call": {"duration": 0.01, "outcome": "passed"}},
+    {"nodeid": "tests/test_calc.py::test_case_3", "lineno": 8, "outcome": "passed", "call": {"duration": 0.01, "outcome": "passed"}},
+    {"nodeid": "tests/test_calc.py::test_case_4", "lineno": 12, "outcome": "passed", "call": {"duration": 0.01, "outcome": "passed"}},
+    {"nodeid": "tests/test_calc.py::test_case_5", "lineno": 16, "outcome": "passed", "call": {"duration": 0.01, "outcome": "passed"}},
+    {"nodeid": "tests/test_calc.py::test_case_6", "lineno": 20, "outcome": "passed", "call": {"duration": 0.01, "outcome": "passed"}},
+    {"nodeid": "tests/test_calc.py::test_case_7", "lineno": 24, "outcome": "passed", "call": {"duration": 0.01, "outcome": "passed"}},
+    {"nodeid": "tests/test_calc.py::test_case_8", "lineno": 28, "outcome": "passed", "call": {"duration": 0.01, "outcome": "passed"}}
+  ]
 }
