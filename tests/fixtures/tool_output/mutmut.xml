@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="mutmut" tests="4" failures="3" errors="0" skipped="0">
+  <testcase classname="mutmut" name="mutant_1"><failure message="killed" /></testcase>
+  <testcase classname="mutmut" name="mutant_2"><failure message="killed" /></testcase>
+  <testcase classname="mutmut" name="mutant_3"><failure message="killed" /></testcase>
+  <testcase classname="mutmut" name="mutant_4" />
+</testsuite>

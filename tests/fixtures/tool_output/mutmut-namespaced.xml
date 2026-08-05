@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite xmlns="urn:junit" name="mutmut" tests="3" failures="1" errors="1">
+  <testcase classname="mutmut" name="mutant_1"><failure message="killed" /></testcase>
+  <testcase classname="mutmut" name="mutant_2"><error message="tool error" /></testcase>
+  <testcase classname="mutmut" name="mutant_3" />
+</testsuite>
