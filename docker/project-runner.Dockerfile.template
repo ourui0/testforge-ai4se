@@ -1,0 +1,14 @@
+FROM python:3.12-slim AS builder
+ENV VIRTUAL_ENV=/opt/venv
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+WORKDIR /build
+COPY . /build
+RUN python -m pip install --no-cache-dir pytest coverage mutmut .
+
+FROM python:3.12-slim AS runtime
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH" PYTHONPATH=/workspace/src
+RUN useradd --uid 65532 --no-create-home testforge
+USER 65532:65532
+WORKDIR /workspace

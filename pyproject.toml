@@ -28,4 +28,7 @@ packages = ["src/testforge"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q --basetemp=.pytest_tmp"
+addopts = "-q --basetemp=.pytest_tmp --ignore=tests/fixtures -m 'not docker'"
+markers = [
+  "docker: tests that require a running Docker daemon and pre-built image",
+]
