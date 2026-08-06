@@ -1681,7 +1681,7 @@ Commit: `git add src/testforge/tools/dispatcher.py tests/unit/tools/test_dispatc
 - Consumes: repository, state machine, LLM, dispatcher, feedback, quality gate, memory, governance, and approvals.
 - Produces: `ContextBuilder.build`, `AgentEngine.advance(task_id)`, `run_until_blocked(task_id)`, `resume(task_id, approval_id)`, `ApplicationService` use cases, and `build_application` composition root.
 
-- [ ] **Step 1: Write the failing one-transition-per-advance test**
+- [x] **Step 1: Write the failing one-transition-per-advance test**
 
 ```python
 def test_advance_is_persisted_and_idempotent(engine, repo, created_task):
@@ -1692,12 +1692,12 @@ def test_advance_is_persisted_and_idempotent(engine, repo, created_task):
     assert len(repo.list_task_events(created_task.id)) == 1
 ```
 
-- [ ] **Step 2: Run engine unit test to verify RED**
+- [x] **Step 2: Run engine unit test to verify RED**
 
 Run: `python -m pytest tests/unit/test_engine.py -v`  
 Expected: FAIL because `AgentEngine` does not exist.
 
-- [ ] **Step 3: Implement explicit state handlers**
+- [x] **Step 3: Implement explicit state handlers**
 
 ```python
 class AgentEngine:
@@ -1777,7 +1777,7 @@ class ContextBuilder:
         )
 ```
 
-- [ ] **Step 4: Write the failing full mock-loop mechanism test**
+- [x] **Step 4: Write the failing full mock-loop mechanism test**
 
 ```python
 def test_surviving_mutant_feedback_changes_second_llm_action(mock_loop):
@@ -1792,7 +1792,7 @@ def test_surviving_mutant_feedback_changes_second_llm_action(mock_loop):
 
 Build the fixture with scripted analyzer results: baseline has one surviving mutant, attempt one leaves it alive, attempt two kills it. Add tests for `NO_ACTION_NEEDED`, two-round stagnation, budget exhaustion, refactor pause/resume, apply pause, cancellation, and stale workspace.
 
-- [ ] **Step 5: Run complete engine tests and commit**
+- [x] **Step 5: Run complete engine tests and commit**
 
 Run: `python -m pytest tests/unit/test_engine.py tests/integration/test_mock_loop.py -v`  
 Expected: PASS.  
