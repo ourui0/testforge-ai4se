@@ -1810,7 +1810,7 @@ Commit: `git add src/testforge/context.py src/testforge/engine.py src/testforge/
 - Consumes: OS keyring backend and optional environment mapping.
 - Produces: `CredentialStore.set`, `status`, `get`, `clear`, and `CredentialStatus`.
 
-- [ ] **Step 1: Write failing no-plaintext-status and keyring tests**
+- [x] **Step 1: Write failing no-plaintext-status and keyring tests**
 
 ```python
 def test_status_never_returns_secret(fake_keyring):
@@ -1822,12 +1822,12 @@ def test_status_never_returns_secret(fake_keyring):
     assert fake_keyring.saved == ("testforge", "openai", "sk-example-not-real")
 ```
 
-- [ ] **Step 2: Run credential tests to verify RED**
+- [x] **Step 2: Run credential tests to verify RED**
 
 Run: `python -m pytest tests/unit/test_credentials.py -v`  
 Expected: FAIL because `CredentialStore` does not exist.
 
-- [ ] **Step 3: Implement keyring-first storage and explicit dotenv fallback**
+- [x] **Step 3: Implement keyring-first storage and explicit dotenv fallback**
 
 ```python
 class CredentialStore:
@@ -1860,7 +1860,7 @@ class CredentialStore:
             return
 ```
 
-- [ ] **Step 4: Add clear, missing-key, explicit-fallback, and redaction tests**
+- [x] **Step 4: Add clear, missing-key, explicit-fallback, and redaction tests**
 
 Assert environment values are ignored unless `allow_dotenv=True`; exception and status representations contain no secret; clear is idempotent when the backend reports a missing entry.
 
@@ -1897,7 +1897,7 @@ Commit: `git add src/testforge/credentials.py tests/unit/test_credentials.py && 
 - Consumes: `LLMClient`, `GenerationContext`, `FeedbackPacket`, `LLMResponse`, and `CredentialStore`.
 - Produces: `OpenAIClient.generate` with normalized `LLMError` failures.
 
-- [ ] **Step 1: Write the failing structured-response adapter test**
+- [x] **Step 1: Write the failing structured-response adapter test**
 
 ```python
 def test_openai_adapter_requests_validated_llm_response(fake_openai, credential_store):
@@ -1910,12 +1910,12 @@ def test_openai_adapter_requests_validated_llm_response(fake_openai, credential_
     assert "shell" not in call["input"]
 ```
 
-- [ ] **Step 2: Run adapter test to verify RED**
+- [x] **Step 2: Run adapter test to verify RED**
 
 Run: `python -m pytest tests/unit/llm/test_openai_adapter.py -v`  
 Expected: FAIL because the OpenAI adapter does not exist.
 
-- [ ] **Step 3: Implement Responses API structured parsing behind the provider-neutral interface**
+- [x] **Step 3: Implement Responses API structured parsing behind the provider-neutral interface**
 
 ```python
 class OpenAIClient:
@@ -1939,7 +1939,7 @@ class OpenAIClient:
 
 `_build_input` includes target summaries, constraints, selected memory, baseline, and feedback but no key, full repository, or arbitrary tool descriptions.
 
-- [ ] **Step 4: Add authentication, rate-limit, timeout, refusal, invalid-schema, and secret-redaction tests**
+- [x] **Step 4: Add authentication, rate-limit, timeout, refusal, invalid-schema, and secret-redaction tests**
 
 Use fake SDK exceptions; assert each becomes one of `authentication`, `rate_limit`, `timeout`, `refusal`, or `invalid_response` without provider message text that could contain a credential.
 
