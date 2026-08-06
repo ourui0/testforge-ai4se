@@ -1976,7 +1976,7 @@ Commit: `git add src/testforge/llm/openai_adapter.py tests/unit/llm/test_openai_
 - Consumes: `ApplicationService` and `CredentialStore`.
 - Produces: `testforge init`, `credentials set|status|clear`, `run`, `status`, `approve`, `reject`, `apply`, `history`, and `serve` commands.
 
-- [ ] **Step 1: Write failing init/run/status CLI tests**
+- [x] **Step 1: Write failing init/run/status CLI tests**
 
 ```python
 def test_run_prints_task_id_without_secret(cli_runner, app, monkeypatch):
@@ -1994,12 +1994,12 @@ def test_init_requires_explicit_trust_before_dependency_build(cli_runner, app, m
     assert app.project_image_builds == []
 ```
 
-- [ ] **Step 2: Run CLI tests to verify RED**
+- [x] **Step 2: Run CLI tests to verify RED**
 
 Run: `python -m pytest tests/unit/test_cli.py -v`  
 Expected: FAIL because CLI does not exist.
 
-- [ ] **Step 3: Implement commands as thin application-service calls**
+- [x] **Step 3: Implement commands as thin application-service calls**
 
 ```python
 cli = typer.Typer(no_args_is_help=True)
@@ -2031,7 +2031,7 @@ def credential_set(provider: str = "openai") -> None:
 
 Add `[project.scripts] testforge = "testforge.cli:cli"` to `pyproject.toml`.
 
-- [ ] **Step 4: Add approval, stale, cancellation, history, and credential-output tests**
+- [x] **Step 4: Add approval, stale, cancellation, history, and credential-output tests**
 
 Assert approval commands require UUIDs, show patch hashes but not full source, rejected approvals resume correctly, and `credentials status` prints configured/source only.
 
