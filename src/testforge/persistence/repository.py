@@ -288,7 +288,13 @@ class SQLiteTaskRepository:
         with self._session_factory.begin() as session:
             rows = (
                 session.query(MemoryEntryRow)
-                .filter(MemoryEntryRow.project_id == project_id)
+                .filter(
+                    MemoryEntryRow.project_id == project_id,
+                    (
+                        MemoryEntryRow.expires_at.is_(None)
+                        | (MemoryEntryRow.expires_at > datetime.now(UTC))
+                    ),
+                )
                 .order_by(MemoryEntryRow.created_at.desc())
                 .offset(maximum)
                 .all()

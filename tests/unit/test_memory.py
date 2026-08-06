@@ -61,6 +61,37 @@ def test_memory_allows_summary_at_2000_chars(memory: ProjectMemory) -> None:
     assert len(result[0].summary) == 2000
 
 
+# ── F1 regression: source / prompt rejection ────────────────────────
+
+def test_memory_rejects_kind_source(memory: ProjectMemory) -> None:
+    """Entries explicitly marked as kind='source' must be rejected."""
+    with pytest.raises(PolicyViolation):
+        memory.remember("p", kind="source", tags=(), summary="some code")
+
+
+def test_memory_rejects_kind_prompt(memory: ProjectMemory) -> None:
+    """Entries explicitly marked as kind='prompt' must be rejected."""
+    with pytest.raises(PolicyViolation):
+        memory.remember("p", kind="prompt", tags=(), summary="a complete LLM prompt")
+
+
+def test_memory_rejects_source_code_in_summary(memory: ProjectMemory) -> None:
+    """Summaries containing source code patterns must be rejected even
+    under a benign kind."""
+    with pytest.raises(PolicyViolation):
+        memory.remember("p", kind="strategy", tags=(),
+                        summary="def foo():\n    pass\n\nclass Bar:\n    pass")
+
+
+def test_memory_allows_single_def_mention(memory: ProjectMemory) -> None:
+    """A summary that *mentions* a function name but is not source code
+    must be allowed."""
+    memory.remember("p", kind="strategy", tags=(),
+                    summary="add tests for foo() and Bar() in utils.py")
+    result = memory.select("p", tags=(), limit=1)
+    assert "foo()" in result[0].summary
+
+
 # ── bounded selection and tag matching ───────────────────────────────
 
 def test_select_respects_limit(memory: ProjectMemory) -> None:

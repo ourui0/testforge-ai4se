@@ -13,6 +13,8 @@ if TYPE_CHECKING:
     from testforge.persistence.repository import SQLiteTaskRepository
 
 _SECRET_PATTERN = re.compile(r"sk-[A-Za-z0-9_-]+")
+_SOURCE_LINE_PATTERN = re.compile(r"^\s*(def |class |import |from )", re.MULTILINE)
+_FORBIDDEN_KINDS = frozenset({"source", "prompt"})
 _SUMMARY_MAX_LENGTH = 2000
 _DEFAULT_PROJECT_CAPACITY = 500
 _DEFAULT_SELECT_LIMIT = 8
@@ -65,10 +67,18 @@ class ProjectMemory:
         source_task_id: UUID | None = None,
         expires_at: datetime | None = None,
     ) -> MemoryEntry:
+        if kind in _FORBIDDEN_KINDS:
+            raise PolicyViolation(
+                f"memory kind {kind!r} is forbidden: summaries only, never full source or prompt"
+            )
         if _SECRET_PATTERN.search(summary):
             raise PolicyViolation("memory summary contains secret-like content")
         if not summary.strip():
             raise PolicyViolation("memory summary must not be empty")
+        if len(_SOURCE_LINE_PATTERN.findall(summary)) >= 2:
+            raise PolicyViolation(
+                "memory summary must not contain source code or complete prompts"
+            )
 
         try:
             entry = MemoryEntry(
@@ -82,7 +92,7 @@ class ProjectMemory:
                 version=1,
             )
         except ValidationError as exc:
-            raise PolicyViolation(str(exc)) from exc
+            raise PolicyViolation("memory summary validation failed") from exc
         self._repository.add_memory(entry)
         self._repository.trim_memory(
             project_id=project_id, maximum=_DEFAULT_PROJECT_CAPACITY

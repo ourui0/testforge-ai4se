@@ -73,7 +73,7 @@ class MemoryEntryRow(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     project_id: Mapped[str] = mapped_column(String(256), nullable=False, index=True)
     kind: Mapped[str] = mapped_column(String(48), nullable=False)
-    tags: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    tags: Mapped[object] = mapped_column(JSON, nullable=False)
     summary: Mapped[str] = mapped_column(String(2000), nullable=False)
     source_task_id: Mapped[str | None] = mapped_column(String(36))
     created_at: Mapped[datetime] = mapped_column(
