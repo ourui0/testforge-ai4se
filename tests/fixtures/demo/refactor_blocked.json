@@ -1,0 +1,10 @@
+{
+  "responses": [
+    {"refactor": {"path": "src/calc.py", "patch": "--- a/src/calc.py\n+++ b/src/calc.py\n@@ -1,3 +1,3 @@\n", "reason": "improve performance", "risk": "low"}},
+    {"test": {"path": "tests/test_calc.py", "content": "def test_add(): assert add(1,2)==3", "strategy": "boundary test"}}
+  ],
+  "tool_results": [
+    {"exit_code": 0, "stdout": "", "stderr": ""},
+    {"exit_code": 0, "stdout": "", "stderr": ""}
+  ]
+}
