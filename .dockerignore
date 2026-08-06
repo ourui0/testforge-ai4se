@@ -1,0 +1,13 @@
+.git
+.gitignore
+.venv
+__pycache__
+*.pyc
+.pytest_tmp
+.worktrees
+.claude
+*.key
+*.pem
+.env
+node_modules
+tests
