@@ -50,6 +50,7 @@ class AgentEngine:
             TaskState.MEASURING_COVERAGE: self._handle_measuring_coverage,
             TaskState.MUTATION_TESTING: self._handle_mutation_testing,
             TaskState.EVALUATING: self._handle_evaluating,
+            TaskState.APPLYING_PATCH: self._handle_applying_patch,
         }
 
     def advance(self, task_id: UUID) -> TransitionResult:
@@ -154,6 +155,11 @@ class AgentEngine:
     def _handle_evaluating(self, task: TaskRecord) -> tuple[TaskEvent, str]:
         _ = task
         return TaskEvent.QUALITY_PASSED, "quality gate passed"
+
+    @staticmethod
+    def _handle_applying_patch(task: TaskRecord) -> tuple[TaskEvent, str]:
+        _ = task
+        return TaskEvent.APPLY_SUCCEEDED, "patch applied"
 
 
 _BLOCKING_STATES = frozenset({

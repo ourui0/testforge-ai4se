@@ -105,6 +105,20 @@ def test_run_until_blocked_stops_at_blocking_state(
     }
 
 
+def test_f1_applying_patch_not_deadlocked(
+    engine: AgentEngine, repo: SQLiteTaskRepository, created_task: TaskRecord
+) -> None:
+    """F1 regression: APPLYING_PATCH must transition to COMPLETED."""
+    task_id = created_task.id
+    from testforge.domain.state_machine import TaskEvent as TE
+
+    repo.record_transition(
+        task_id, TE.START, TaskState.APPLYING_PATCH, "force to APPLYING_PATCH"
+    )
+    result = engine.advance(task_id)
+    assert result.current_state == TaskState.COMPLETED
+
+
 def test_resume_from_awaiting_approval(
     engine: AgentEngine, repo: SQLiteTaskRepository, created_task: TaskRecord
 ) -> None:
