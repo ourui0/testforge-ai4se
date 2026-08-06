@@ -1445,7 +1445,7 @@ Commit: `git add src/testforge/memory.py src/testforge/persistence tests/unit/te
 - Consumes: `TaskBudget`, `CommandResult`, `SandboxError`, a user-confirmed trusted project root, and its dependency files.
 - Produces: `ProjectImageBuilder.fingerprint`, `build`, `DockerSandboxRunner.run(argv, workspace, timeout_seconds) -> CommandResult`, and `cleanup()`.
 
-- [ ] **Step 1: Write the failing dependency-image fingerprint and final-image boundary tests**
+- [x] **Step 1: Write the failing dependency-image fingerprint and final-image boundary tests**
 
 ```python
 def test_dependency_fingerprint_changes_with_pyproject(tmp_path, image_builder):
@@ -1465,12 +1465,12 @@ def test_generated_final_stage_copies_venv_but_not_project_source(image_builder,
     assert "COPY ." not in final_stage
 ```
 
-- [ ] **Step 2: Run image-builder tests to verify RED**
+- [x] **Step 2: Run image-builder tests to verify RED**
 
 Run: `python -m pytest tests/unit/sandbox/test_image_builder.py -v`  
 Expected: FAIL because `ProjectImageBuilder` does not exist.
 
-- [ ] **Step 3: Implement a local-only multi-stage project image build**
+- [x] **Step 3: Implement a local-only multi-stage project image build**
 
 ```dockerfile
 FROM python:3.12-slim AS builder
@@ -1491,12 +1491,12 @@ WORKDIR /workspace
 
 `ProjectImageBuilder.build` uses a tag `testforge-project:<dependency fingerprint>`, requires an explicit `trusted_project=True` argument from the application layer, records that the build may access package indexes and execute the project's build backend, and never pushes the image. Reject `.env`, `.git`, key files, and user-home content from the build context.
 
-- [ ] **Step 4: Run image-builder tests to verify GREEN**
+- [x] **Step 4: Run image-builder tests to verify GREEN**
 
 Run: `python -m pytest tests/unit/sandbox/test_image_builder.py -v`  
 Expected: PASS.
 
-- [ ] **Step 5: Write the failing Docker option test with a fake client**
+- [x] **Step 5: Write the failing Docker option test with a fake client**
 
 ```python
 def test_container_is_non_root_offline_and_resource_limited(tmp_path, fake_docker_client):
@@ -1511,12 +1511,12 @@ def test_container_is_non_root_offline_and_resource_limited(tmp_path, fake_docke
     assert "/var/run/docker.sock" not in repr(options["volumes"])
 ```
 
-- [ ] **Step 6: Run sandbox unit test to verify RED**
+- [x] **Step 6: Run sandbox unit test to verify RED**
 
 Run: `python -m pytest tests/unit/sandbox/test_docker_runner.py -v`  
 Expected: FAIL because the sandbox runner does not exist.
 
-- [ ] **Step 7: Implement container lifecycle and timeout cleanup**
+- [x] **Step 7: Implement container lifecycle and timeout cleanup**
 
 ```python
 class DockerSandboxRunner:
@@ -1555,7 +1555,7 @@ class DockerSandboxRunner:
             container.remove(force=True)
 ```
 
-- [ ] **Step 8: Add timeout/cleanup unit cases and a tagged real-container integration test**
+- [x] **Step 8: Add timeout/cleanup unit cases and a tagged real-container integration test**
 
 ```python
 @pytest.mark.docker
@@ -1574,7 +1574,7 @@ Expected: PASS.
 Run: `python -m pytest tests/integration/sandbox -m docker -v`  
 Expected when Docker is available: PASS.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 Commit: `git add src/testforge/sandbox docker tests/unit/sandbox tests/integration/sandbox tests/fixtures/projects/simple_math && git commit -m "feat: build and isolate project test environments"`
 
