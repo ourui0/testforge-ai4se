@@ -1592,7 +1592,7 @@ Commit: `git add src/testforge/sandbox docker tests/unit/sandbox tests/integrati
 
 **Ownership clarification:** this task exclusively owns undeclared/unknown tool and action rejection. Raw action payloads must pass the discriminated `ToolRequest` adapter and the explicit handler registry; no generic string action validator is added to `GovernancePolicy`.
 
-- [ ] **Step 1: Write failing unknown-tool and valid-pytest dispatch tests**
+- [x] **Step 1: Write failing unknown-tool and valid-pytest dispatch tests**
 
 ```python
 def test_unknown_tool_is_rejected(dispatcher):
@@ -1605,12 +1605,12 @@ def test_run_pytest_uses_fixed_argv(dispatcher, sandbox):
     assert sandbox.last_argv == ("python", "-m", "pytest", "--json-report", "--json-report-file=/tmp/pytest.json", "-q")
 ```
 
-- [ ] **Step 2: Run dispatcher tests to verify RED**
+- [x] **Step 2: Run dispatcher tests to verify RED**
 
 Run: `python -m pytest tests/unit/tools/test_dispatcher.py -v`  
 Expected: FAIL because the dispatcher does not exist.
 
-- [ ] **Step 3: Implement discriminated requests and explicit registry**
+- [x] **Step 3: Implement discriminated requests and explicit registry**
 
 ```python
 class ToolName(StrEnum):
@@ -1642,7 +1642,7 @@ class DomainToolDispatcher:
 
 Hard-code analyzer argument vectors in handlers. Never concatenate user strings into a command.
 
-- [ ] **Step 4: Add read/write/refactor/export policy tests**
+- [x] **Step 4: Add read/write/refactor/export policy tests**
 
 Assert every handler invokes the corresponding `GovernancePolicy` check, never returns complete source in an audit event, and refuses a refactor application without a matching approval ID and patch hash.
 
