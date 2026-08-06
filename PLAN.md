@@ -2075,7 +2075,7 @@ Commit: `git add src/testforge/cli.py tests/unit/test_cli.py pyproject.toml && g
 - Consumes: `ApplicationService` DTOs only.
 - Produces: HTML routes for task creation, task detail, approval decisions, settings status, and memory clearing.
 
-- [ ] **Step 1: Write failing route-boundary tests**
+- [x] **Step 1: Write failing route-boundary tests**
 
 ```python
 def test_task_detail_shows_metrics_and_never_secret(test_client, fake_app):
@@ -2086,12 +2086,12 @@ def test_task_detail_shows_metrics_and_never_secret(test_client, fake_app):
     assert "sk-example" not in response.text
 ```
 
-- [ ] **Step 2: Run Web route tests to verify RED**
+- [x] **Step 2: Run Web route tests to verify RED**
 
 Run: `python -m pytest tests/unit/web/test_routes.py -v`  
 Expected: FAIL because Web app does not exist.
 
-- [ ] **Step 3: Implement app factory and server-rendered routes**
+- [x] **Step 3: Implement app factory and server-rendered routes**
 
 ```python
 def create_app(application: ApplicationService, demo_mode: bool = False) -> FastAPI:
@@ -2112,7 +2112,7 @@ def create_app(application: ApplicationService, demo_mode: bool = False) -> Fast
     return app
 ```
 
-- [ ] **Step 4: Add CSRF token, invalid UUID, stale approval, memory-clear, accessibility, and local-static tests**
+- [x] **Step 4: Add CSRF token, invalid UUID, stale approval, memory-clear, accessibility, and local-static tests**
 
 Assert every mutation form requires a session CSRF token; templates have labels, headings, keyboard-focus styles, textual state indicators, and no color-only meaning; HTMX is served locally with its license.
 
@@ -2151,7 +2151,7 @@ Commit: `git add src/testforge/web tests/unit/web && git commit -m "feat: add lo
 - Consumes: `MockLLMClient`, fixture analyzer results, Web app factory.
 - Produces: `DemoScenario`, `DemoApplicationFactory`, and demo-only routes that cannot accept external code or credentials.
 
-- [ ] **Step 1: Write failing demo boundary test**
+- [x] **Step 1: Write failing demo boundary test**
 
 ```python
 def test_demo_mode_rejects_repository_upload_url_and_credentials(demo_client):
@@ -2161,12 +2161,12 @@ def test_demo_mode_rejects_repository_upload_url_and_credentials(demo_client):
     assert "api_key" in response.text
 ```
 
-- [ ] **Step 2: Run demo tests to verify RED**
+- [x] **Step 2: Run demo tests to verify RED**
 
 Run: `python -m pytest tests/unit/web/test_demo_mode.py -v`  
 Expected: FAIL because demo mode does not exist.
 
-- [ ] **Step 3: Implement closed fixture registry and demo factory**
+- [x] **Step 3: Implement closed fixture registry and demo factory**
 
 ```python
 class DemoTaskRequest(BaseModel):
@@ -2203,7 +2203,7 @@ class DemoApplicationFactory:
 
 The request schema contains only `scenario`; FastAPI must reject every extra field.
 
-- [ ] **Step 4: Add end-to-end weak-test → feedback → strong-test → approval test**
+- [x] **Step 4: Add end-to-end weak-test → feedback → strong-test → approval test**
 
 Use `TestClient` to select `weak-then-strong`, advance the task, assert the timeline contains one surviving-mutant feedback event, approve the final test diff, and assert the demo records a simulated write-back without touching disk.
 
@@ -2238,7 +2238,7 @@ Commit: `git add src/testforge/demo.py tests/fixtures/demo tests/unit/web/test_d
 - Consumes: `DemoApplicationFactory`, `GovernancePolicy`, and mock-loop fixtures.
 - Produces: a network-free executable demonstration with stable JSON output.
 
-- [ ] **Step 1: Write the failing demonstration contract test**
+- [x] **Step 1: Write the failing demonstration contract test**
 
 ```python
 def test_demo_reports_all_required_mechanisms(run_demo):
@@ -2250,12 +2250,12 @@ def test_demo_reports_all_required_mechanisms(run_demo):
     assert report["final_state"] == "awaiting_apply_approval"
 ```
 
-- [ ] **Step 2: Run the contract test to verify RED**
+- [x] **Step 2: Run the contract test to verify RED**
 
 Run: `python -m pytest tests/e2e/test_mechanism_demo.py -v`  
 Expected: FAIL because the script does not exist.
 
-- [ ] **Step 3: Implement deterministic JSON report generation**
+- [x] **Step 3: Implement deterministic JSON report generation**
 
 ```python
 def main() -> int:
@@ -2270,7 +2270,7 @@ if __name__ == "__main__":
 
 `run_mechanism_demo` first submits `src/calc.py` as a test proposal and captures the deterministic policy rejection; it then runs the scripted two-attempt loop and returns both strategies, feedback category, metric deltas, and final waiting-approval state.
 
-- [ ] **Step 4: Verify network independence and stable output**
+- [x] **Step 4: Verify network independence and stable output**
 
 Run twice with an environment mapping that removes `OPENAI_API_KEY`; assert byte-identical JSON and no outbound client factory call.
 
@@ -2314,7 +2314,7 @@ Commit: `git add scripts/mechanism_demo.py tests/e2e/test_mechanism_demo.py && g
 - Consumes: all completed application and test entry points.
 - Produces: PyPI artifact, Docker image, platform-compatible CI, one-command test entry, and complete user/security documentation.
 
-- [ ] **Step 1: Write failing packaging and container smoke tests**
+- [x] **Step 1: Write failing packaging and container smoke tests**
 
 ```python
 def test_installed_package_exposes_cli():
@@ -2329,12 +2329,12 @@ def test_demo_health_endpoint(test_client):
     assert response.json() == {"status": "ok", "mode": "demo"}
 ```
 
-- [ ] **Step 2: Run packaging smoke tests to verify RED**
+- [x] **Step 2: Run packaging smoke tests to verify RED**
 
 Run: `python -m pytest tests/e2e/test_distribution.py -v`  
 Expected: FAIL until the module entry point and health route are configured.
 
-- [ ] **Step 3: Add reproducible package, Docker, and test commands**
+- [x] **Step 3: Add reproducible package, Docker, and test commands**
 
 ```dockerfile
 FROM python:3.12-slim AS runtime
@@ -2351,7 +2351,7 @@ CMD ["uvicorn", "testforge.web.app:create_demo_app", "--factory", "--host", "0.0
 
 Add `testforge-demo = "testforge.demo:main"` and include templates/static assets in the wheel. Define `python -m pytest` as the one-command test entry in README.
 
-- [ ] **Step 4: Add dual CI with an exact `unit-test` job**
+- [x] **Step 4: Add dual CI with an exact `unit-test` job**
 
 GitHub Actions runs the unit and fast mock-integration suites on Python 3.11 and 3.12; Ruff, mypy, wheel build, Docker build, and mechanism demo may run once on Python 3.12. `.gitlab-ci.yml` defines a job named exactly `unit-test` on Python 3.12 that runs `python -m pytest tests/unit tests/integration/test_mock_loop.py`, followed by package and container build jobs. Docker-dependent sandbox tests run only on a runner explicitly labeled/configured for Docker.
 
@@ -2376,7 +2376,7 @@ package:
     paths: [dist/]
 ```
 
-- [ ] **Step 5: Write README and license inventory**
+- [x] **Step 5: Write README and license inventory**
 
 README must contain: project introduction, architecture, installation from PyPI, CLI commands, local WebUI, public demo distinction, Docker commands, OS-keyring setup/status/update/clear, explicit `.env` risks, target-machine secret setup, directory structure, security boundaries, supported platform/architecture, Docker prerequisite, known limitations, one-command tests, mechanism demo, deployment architecture, and CI/CD. `LICENSES.md` lists every direct dependency and the vendored HTMX license.
 
@@ -2401,7 +2401,7 @@ README must contain: project introduction, architecture, installation from PyPI,
 ## Third-Party Licenses
 ```
 
-- [ ] **Step 6: Run full verification**
+- [x] **Step 6: Run full verification**
 
 Run: `python -m pytest`  
 Expected: all non-Docker-required tests PASS with zero failures.  
@@ -2418,7 +2418,7 @@ Expected: exit 0 with deterministic JSON.
 Run: `git grep -n -I -E "(sk-[A-Za-z0-9_-]{12,}|OPENAI_API_KEY=.+)" -- . ":(exclude)PLAN.md"`  
 Expected: no real-looking credential assignment or token.
 
-- [ ] **Step 7: Update evidence and commit**
+- [x] **Step 7: Update evidence and commit**
 
 Mark every completed task in `PLAN.md` with its commit hash. Append CI/build/test results and human interventions to `AGENT_LOG.md`.
 
