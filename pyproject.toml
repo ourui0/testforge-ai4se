@@ -37,5 +37,6 @@ markers = [
 ]
 filterwarnings = [
   "ignore::pytest.PytestCollectionWarning",
-  "ignore::DeprecationWarning:starlette.*",
+  "ignore::Warning:starlette.*",
+  "ignore::Warning:fastapi.*",
 ]
