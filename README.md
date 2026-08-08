@@ -60,24 +60,46 @@ testforge serve
 The WebUI shows task timelines, metrics, pending approvals, and
 credential status — operating only on trusted local repositories.
 
-## Public Mock Demo
+## Live Demo
 
-A read-only demo mode shows the core feedback loop without
-executing code or requiring credentials:
+A read-only public demo is deployed at:
+
+👉 **https://testforge-demo.onrender.com**
+
+The demo showcases the core feedback loop:
+- **Weak → Strong**: weak test fails quality gate → feedback drives a second, stronger attempt
+- **Refactor Blocked**: LLM proposes a refactor → governance gate pauses for human approval → after rejection, proceeds with test generation
+
+No credentials, no Docker, no real LLM, no external code execution — all
+behavior is driven by deterministic, pre-recorded state sequences.
+
+### Deploy Your Own
+
+Click the button below to deploy a copy to Render (free tier):
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/YOUR_ORG/testforge)
+
+Or run the demo locally:
 
 ```bash
 # Start in demo mode:
-uvicorn testforge.web.app:create_app --factory --host 0.0.0.0 --port 8000
+uvicorn testforge.web.app:create_demo_app --factory --host 0.0.0.0 --port 8000
 
-# POST to /demo/tasks with {"scenario": "weak-then-strong"}
-# The demo accepts only pre-defined scenario names — no URLs, no keys.
+# Open http://localhost:8000
+# Select a demo scenario and watch the feedback loop in action
 ```
+
+The demo accepts only pre-defined scenario names — no URLs, no keys.
 
 ## Docker Distribution
 
 ```bash
+# Build and run the full application (requires Docker daemon):
 docker build -t testforge:local .
 docker run -p 8000:8000 testforge:local
+
+# The container runs in demo mode by default — no credentials needed.
+# For full mode with local repositories, mount a volume and use the CLI.
 ```
 
 ## Testing and Mechanism Demo

@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: testforge-demo
+    runtime: python
+    plan: free
+    buildCommand: pip install -e .
+    startCommand: uvicorn testforge.web.app:create_demo_app --factory --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+    healthCheckPath: /healthz

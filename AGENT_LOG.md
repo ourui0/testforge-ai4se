@@ -253,3 +253,20 @@
 - **人工修改**：无。
 - **PR 状态**：本地已合入；`feature/testforge-implementation` 已推送至 origin。
 
+## 2026-08-08 · 部署 WebUI 到 Render
+
+- **阶段/任务**：将 TestForge WebUI 部署到 Render 公网（方案二：CLI + WebUI）。
+- **Superpowers 技能**：`subagent-driven-development`。
+- **关键 context**：需要提供可公开访问的 WebUI URL；demo 模式不能依赖 Docker、keyring、OpenAI。
+- **实现内容**：
+  - 重写 `src/testforge/web/app.py`：新增 `DemoApplication` 类（内存状态机 + 预编排场景序列）、`create_demo_app()` 工厂函数、增强 demo HTML 页面（CSS 样式、进度条、时间线、自动推进）。
+  - 两个预编排场景：`weak-then-strong`（16 步，展示反馈闭环：弱测试 → 质量门槛拒绝 → 强测试通过）和 `refactor-blocked`（14 步，展示治理拦截 → 人工审批 → 拒绝后继续生成）。
+  - 拆分 `pyproject.toml` 依赖：将 `keyring`、`openai`、`docker` 移入 `[optional]full` 组，core deps 仅保留 pydantic/sqlalchemy/typer/fastapi/uvicorn 等纯 Python 包，确保 Render 免费 tier 可安装。
+  - 新增 `render.yaml`（Render Blueprint 部署配置）、`.python-version`（3.12）。
+  - 修复 `Dockerfile`：`pip install ".[full]"` 安装完整依赖。
+  - 更新 `README.md`：添加 Live Demo 公网链接、Demo 场景说明、本地运行命令。
+  - 更新 `.github/workflows/ci.yml`：`pip install -e ".[dev,full]"`。
+- **验证**：本地 `uvicorn testforge.web.app:create_demo_app --factory` 启动成功；POST `/demo/tasks` 返回 task_id；`/tasks/{id}` 页面展示完整时间线；auto-advance 功能正常。
+- **人工修改**：DemoApplication 的场景序列为人工编排，确保每个 step 的 state/metrics/reason 准确反映 TestForge 状态机语义。
+- **部署 URL**：https://testforge-demo.onrender.com（待推送代码后在 Render 控制台确认）。
+

@@ -3,7 +3,7 @@ RUN useradd --uid 10001 --create-home testforge
 WORKDIR /app
 COPY pyproject.toml README.md /app/
 COPY src /app/src
-RUN python -m pip install --no-cache-dir .
+RUN python -m pip install --no-cache-dir ".[full]"
 USER 10001
 EXPOSE 8000
 HEALTHCHECK CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz')"
