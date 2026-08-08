@@ -35,3 +35,7 @@ addopts = "-q --basetemp=.pytest_tmp --ignore=tests/fixtures -m 'not docker'"
 markers = [
   "docker: tests that require a running Docker daemon and pre-built image",
 ]
+filterwarnings = [
+  "ignore::pytest.PytestCollectionWarning",
+  "ignore::DeprecationWarning:starlette.*",
+]

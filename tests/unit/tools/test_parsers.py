@@ -208,18 +208,20 @@ def test_unsupported_mutation_maps_to_unsupported_snapshot():
     assert snapshot.mutation_status == "unsupported"
 
 
+_WS = "/home/ci/project"
+
+
 def test_command_diagnostic_redacts_workspace_variants_case_insensitively():
     command = CommandResult(
         exit_code=1,
-        stdout="C:\\Work\\Repo\\a.py c:/work/repo/b.py C:/WORK/REPO/c.py",
-        stderr="c:\\work\\repo\\d.py",
+        stdout=f"{_WS}/a.py /HOME/CI/PROJECT/b.py /home/ci/project/c.py",
+        stderr=f"{_WS}/d.py",
     )
 
-    summary = command.diagnostic_summary(Path("C:\\Work\\Repo"))
+    summary = command.diagnostic_summary(Path(_WS))
 
-    assert "C:\\Work\\Repo" not in summary
-    assert "c:/work/repo" not in summary
-    assert "C:/WORK/REPO" not in summary
+    assert "/home/ci/project" not in summary
+    assert "/HOME/CI/PROJECT" not in summary
     assert summary.count("<workspace>") == 4
 
 
@@ -234,10 +236,10 @@ def test_command_diagnostic_redacts_secrets_before_truncating():
 
 
 def test_command_diagnostic_redacts_workspace_before_truncating():
-    raw = ("C:\\Work\\Repo\\" * 150) + "visible-tail"
+    raw = (_WS + "/" * 150) + "visible-tail"
     command = CommandResult(exit_code=0, stdout=raw)
 
-    summary = command.diagnostic_summary(Path("C:\\Work\\Repo"))
+    summary = command.diagnostic_summary(Path(_WS))
 
     assert "visible-tail" in summary
     assert "…<truncated>" not in summary
@@ -246,13 +248,13 @@ def test_command_diagnostic_redacts_workspace_before_truncating():
 def test_command_diagnostic_leaves_raw_streams_unchanged():
     command = CommandResult(
         exit_code=2,
-        stdout="C:\\Work\\Repo sk-secret",
+        stdout=f"{_WS} sk-secret",
         stderr="sk-other",
     )
 
-    command.diagnostic_summary(Path("C:\\Work\\Repo"))
+    command.diagnostic_summary(Path(_WS))
 
-    assert command.stdout == "C:\\Work\\Repo sk-secret"
+    assert command.stdout == f"{_WS} sk-secret"
     assert command.stderr == "sk-other"
 
 
