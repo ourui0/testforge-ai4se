@@ -127,6 +127,8 @@ After Task 3, Tasks 4, 6, 7, and 9 can run in parallel worktrees. Task 13 can ru
 
 ### Task 1: Package Skeleton and Validated Configuration
 
+> **Formal completion:** implementer `/root/task01_implementer`; task commit `f617cf7`; integration merge `313de8f`; RED observed before production code; focused/full suites `4 passed`; independent task review found no issues.
+
 **Files:**
 - Create: `pyproject.toml`
 - Create: `src/testforge/__init__.py`
@@ -138,7 +140,7 @@ After Task 3, Tasks 4, 6, 7, and 9 can run in parallel worktrees. Task 13 can ru
 - Consumes: none.
 - Produces: `TaskBudget`, `QualityThreshold`, and `ProjectConfig` Pydantic models used by all later tasks.
 
-- [ ] **Step 1: Add packaging metadata and write the failing default-budget test**
+- [x] **Step 1: Add packaging metadata and write the failing default-budget test**
 
 ```toml
 [build-system]
@@ -190,7 +192,7 @@ def test_project_config_has_spec_defaults(tmp_path):
     assert config.quality.coverage_target_percent == 90.0
 ```
 
-- [ ] **Step 2: Install into the project virtual environment and verify RED**
+- [x] **Step 2: Install into the project virtual environment and verify RED**
 
 Run with the `.venv` interpreter selected in **Execution Environment Bootstrap**: `python -m pip install -e ".[dev]"`
 
@@ -198,7 +200,7 @@ Run with that same interpreter: `python -m pytest tests/unit/test_config.py -v`
 
 Expected: FAIL because `testforge.config` does not exist.
 
-- [ ] **Step 3: Implement validated immutable configuration**
+- [x] **Step 3: Implement validated immutable configuration**
 
 ```python
 # src/testforge/config.py
@@ -234,7 +236,7 @@ class ProjectConfig(BaseModel):
     quality: QualityThreshold = QualityThreshold()
 ```
 
-- [ ] **Step 4: Add invalid-budget cases and run GREEN**
+- [x] **Step 4: Add invalid-budget cases and run GREEN**
 
 ```python
 import pytest
@@ -251,7 +253,7 @@ def test_budget_rejects_invalid_bounds(field, value):
 Run: `python -m pytest tests/unit/test_config.py -v`  
 Expected: PASS.
 
-- [ ] **Step 5: Add secret/build ignores and commit**
+- [x] **Step 5: Add secret/build ignores and commit**
 
 ```gitignore
 .env
@@ -274,6 +276,10 @@ Commit: `git add pyproject.toml src/testforge/__init__.py src/testforge/config.p
 
 ### Task 2: Domain Models and Pure State Machine
 
+> **Approved clarifications:** (1) the original plan named shared outputs without schemas, so human approval added the minimal immutable contracts already consumed by Tasks 3–12; (2) task review found that a public mutable transition dictionary violates the pure, closed state-machine guarantee, so human approval requires a read-only `MappingProxyType` plus a mutation-rejection regression test.
+
+> **Formal completion:** implementer `/root/task02_implementer`; commits `0003258`, `0d87095`; integration merge `29562a2`; RED observed for state machine, models, and immutable-transition regression; full suite `12 passed`; initial review finding fixed and scoped re-review clean.
+
 **Files:**
 - Create: `src/testforge/domain/__init__.py`
 - Create: `src/testforge/domain/models.py`
@@ -287,10 +293,11 @@ Commit: `git add pyproject.toml src/testforge/__init__.py src/testforge/config.p
 - Consumes: `TaskBudget`, `QualityThreshold` from Task 1.
 - Produces: `TaskState`, `TaskEvent`, `transition(state, event)`, `MetricSnapshot`, `TestProposal`, `RefactorProposal`, `FeedbackPacket`, `TaskRecord`, and stable domain errors.
 
-- [ ] **Step 1: Write failing transition tests**
+- [x] **Step 1: Write failing transition tests**
 
 ```python
-from testforge.domain.state_machine import TaskEvent, TaskState, transition
+import pytest
+from testforge.domain.state_machine import TRANSITIONS, TaskEvent, TaskState, transition
 
 
 def test_evaluation_retries_when_budget_remains():
@@ -303,18 +310,25 @@ def test_refactor_request_pauses_for_approval():
 
 def test_quality_pass_waits_for_apply_approval():
     assert transition(TaskState.EVALUATING, TaskEvent.QUALITY_PASSED) is TaskState.AWAITING_APPLY_APPROVAL
+
+
+def test_transition_table_rejects_external_mutation():
+    with pytest.raises(TypeError):
+        TRANSITIONS[(TaskState.CREATED, TaskEvent.APPLY_SUCCEEDED)] = TaskState.COMPLETED
 ```
 
-- [ ] **Step 2: Run transition tests to verify RED**
+- [x] **Step 2: Run transition tests to verify RED**
 
 Run: `python -m pytest tests/unit/domain/test_state_machine.py -v`  
 Expected: FAIL because the domain package does not exist.
 
-- [ ] **Step 3: Implement enums, legal transition table, and illegal-transition error**
+- [x] **Step 3: Implement enums, legal transition table, and illegal-transition error**
 
 ```python
 # src/testforge/domain/state_machine.py
 from enum import StrEnum
+from types import MappingProxyType
+from typing import Mapping
 from testforge.domain.errors import InvalidTransition
 
 
@@ -368,7 +382,7 @@ def transition(state: TaskState, event: TaskEvent) -> TaskState:
     return TRANSITIONS[key]
 
 
-TRANSITIONS: dict[tuple[TaskState, TaskEvent], TaskState] = {
+_TRANSITIONS: dict[tuple[TaskState, TaskEvent], TaskState] = {
     (TaskState.CREATED, TaskEvent.START): TaskState.VALIDATING_INPUT,
     (TaskState.VALIDATING_INPUT, TaskEvent.INPUT_VALID): TaskState.PREPARING_SANDBOX,
     (TaskState.PREPARING_SANDBOX, TaskEvent.SANDBOX_READY): TaskState.BASELINING,
@@ -389,18 +403,33 @@ TRANSITIONS: dict[tuple[TaskState, TaskEvent], TaskState] = {
 }
 
 for active_state in set(TaskState) - {TaskState.COMPLETED, TaskState.NO_ACTION_NEEDED, TaskState.STOPPED, TaskState.FAILED, TaskState.CANCELLED}:
-    TRANSITIONS[(active_state, TaskEvent.CANCEL)] = TaskState.CANCELLED
-    TRANSITIONS[(active_state, TaskEvent.ERROR)] = TaskState.FAILED
-    TRANSITIONS[(active_state, TaskEvent.WORKSPACE_CHANGED)] = TaskState.STALE
+    _TRANSITIONS[(active_state, TaskEvent.CANCEL)] = TaskState.CANCELLED
+    _TRANSITIONS[(active_state, TaskEvent.ERROR)] = TaskState.FAILED
+    _TRANSITIONS[(active_state, TaskEvent.WORKSPACE_CHANGED)] = TaskState.STALE
 
 for budgeted_state in {TaskState.GENERATING, TaskState.TESTING, TaskState.MEASURING_COVERAGE, TaskState.MUTATION_TESTING, TaskState.EVALUATING}:
-    TRANSITIONS[(budgeted_state, TaskEvent.BUDGET_EXHAUSTED)] = TaskState.STOPPED
+    _TRANSITIONS[(budgeted_state, TaskEvent.BUDGET_EXHAUSTED)] = TaskState.STOPPED
+
+TRANSITIONS: Mapping[tuple[TaskState, TaskEvent], TaskState] = MappingProxyType(_TRANSITIONS)
 ```
 
-- [ ] **Step 4: Write and implement validated domain model tests**
+- [x] **Step 4: Write and implement validated domain model tests**
 
 ```python
-from testforge.domain.models import MetricSnapshot, TestProposal
+import pytest
+from pydantic import ValidationError
+from testforge.config import TaskBudget
+from testforge.domain.models import (
+    ApprovalRequest,
+    AttemptSummary,
+    BudgetUsage,
+    FeedbackPacket,
+    MetricSnapshot,
+    RefactorProposal,
+    TaskRecord,
+    TestProposal,
+)
+from testforge.domain.state_machine import TaskState
 
 
 def test_test_proposal_is_a_single_test_file_replacement():
@@ -411,6 +440,26 @@ def test_test_proposal_is_a_single_test_file_replacement():
 def test_metric_snapshot_computes_mutation_score():
     metrics = MetricSnapshot(tests_passed=4, tests_failed=0, tests_skipped=0, branch_coverage=75.0, mutants_total=4, mutants_killed=3, mutants_survived=1)
     assert metrics.mutation_score == 75.0
+
+
+def test_shared_domain_contracts_have_safe_immutable_defaults():
+    refactor = RefactorProposal(path="src/math.py", patch="@@ -1 +1 @@", reason="isolate clock", risk="low")
+    feedback = FeedbackPacket(failure_category="surviving_mutant", surviving_mutants=("src/math.py:1",), constraints_for_next_attempt=("add a boundary assertion",))
+    usage = BudgetUsage(attempts=5, llm_calls=1, active_seconds=2, mutants=3)
+    attempt = AttemptSummary(branch_coverage=80.0, mutation_score=75.0)
+    task = TaskRecord(project_id="project-1", target_module="src/math.py", attempt_summaries=(attempt,))
+    assert refactor.alternatives == ()
+    assert feedback.stagnated is False
+    assert usage.exhausted(TaskBudget()) is True
+    assert task.state is TaskState.CREATED
+    assert task.pending_patch is None
+    with pytest.raises(ValidationError):
+        task.state = TaskState.FAILED
+
+
+def test_approval_request_requires_sha256_patch_hash():
+    with pytest.raises(ValidationError):
+        ApprovalRequest(kind="apply_tests", patch_hash="not-a-sha256")
 ```
 
 Implement immutable Pydantic models and the errors `InputError`, `ConfigurationError`, `CredentialError`, `LLMError`, `SandboxError`, `ToolExecutionError`, `PolicyViolation`, `StaleWorkspaceError`, and `InvalidTransition`.
@@ -483,6 +532,95 @@ class TestProposal(BaseModel):
     strategy: str
 
 
+class RefactorProposal(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    path: str
+    patch: str
+    reason: str
+    risk: str
+    alternatives: tuple[str, ...] = ()
+
+
+class FeedbackPacket(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    failure_category: str = Field(min_length=1)
+    surviving_mutants: tuple[str, ...] = ()
+    constraints_for_next_attempt: tuple[str, ...] = ()
+    stagnated: bool = False
+
+
+class BudgetUsage(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    attempts: int = Field(default=0, ge=0)
+    llm_calls: int = Field(default=0, ge=0)
+    active_seconds: int = Field(default=0, ge=0)
+    mutants: int = Field(default=0, ge=0)
+
+    def exhausted(self, budget: TaskBudget) -> bool:
+        return (
+            self.attempts >= budget.max_attempts
+            or self.llm_calls >= budget.max_llm_calls
+            or self.active_seconds >= budget.max_active_seconds
+            or self.mutants >= budget.max_mutants
+        )
+
+
+class AttemptSummary(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    branch_coverage: float = Field(ge=0, le=100)
+    mutation_score: float = Field(ge=0, le=100)
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+class ApprovalStatus(StrEnum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    EXPIRED = "expired"
+
+
+class ApprovalRequest(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    id: UUID = Field(default_factory=uuid4)
+    kind: Literal["refactor", "apply_tests"]
+    patch_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    status: ApprovalStatus = ApprovalStatus.PENDING
+    actor: str | None = None
+    created_at: datetime = Field(default_factory=utc_now)
+    decided_at: datetime | None = None
+    expires_at: datetime | None = None
+
+
+class AuditEvent(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    id: UUID = Field(default_factory=uuid4)
+    task_id: UUID
+    event_type: str = Field(min_length=1)
+    reason: str
+    occurred_at: datetime = Field(default_factory=utc_now)
+
+
+class TaskRecord(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    id: UUID = Field(default_factory=uuid4)
+    project_id: str = Field(min_length=1)
+    target_module: str = Field(min_length=1)
+    state: TaskState = TaskState.CREATED
+    budget: TaskBudget = TaskBudget()
+    quality: QualityThreshold = QualityThreshold()
+    usage: BudgetUsage = BudgetUsage()
+    baseline_metrics: MetricSnapshot | None = None
+    latest_metrics: MetricSnapshot | None = None
+    pending_patch: str | None = None
+    memory_tags: tuple[str, ...] = ()
+    constraints: tuple[str, ...] = ()
+    attempt_summaries: tuple[AttemptSummary, ...] = ()
+    surviving_mutants: tuple[str, ...] = ()
+
+
 class TransitionResult(BaseModel):
     model_config = ConfigDict(frozen=True)
     previous_state: TaskState
@@ -491,7 +629,9 @@ class TransitionResult(BaseModel):
     reason: str
 ```
 
-- [ ] **Step 5: Run domain tests and commit**
+The model module imports `datetime`, `timezone`, `UUID`, `uuid4`, `Literal`, `TaskBudget`, `QualityThreshold`, and `TaskState`; define `utc_now()` as `datetime.now(timezone.utc)`. These value objects are contracts only: Task 2 does not implement repositories, approval decisions, feedback algorithms, or engine behavior.
+
+- [x] **Step 5: Run domain tests and commit**
 
 Run: `python -m pytest tests/unit/domain -v`  
 Expected: PASS.  
@@ -500,6 +640,8 @@ Commit: `git add src/testforge/domain tests/conftest.py tests/unit/domain && git
 ---
 
 ### Task 3: Transactional SQLite Repository
+
+> **Formal completion:** implementer `/root/task03_implementer`; task commits `c3ad066`, `af5e6ee`, and `50ccc40`; integration merge `2390774`; initial and review-fix RED evidence captured; persistence suite `18 passed`, full suite `30 passed`; independent review approved after one Important round-trip finding was fixed and re-reviewed as ADDRESSED.
 
 **Files:**
 - Create: `src/testforge/persistence/__init__.py`
@@ -511,7 +653,24 @@ Commit: `git add src/testforge/domain tests/conftest.py tests/unit/domain && git
 - Consumes: `TaskRecord`, `TaskState`, `MetricSnapshot`, and approval/audit value objects from Task 2.
 - Produces: `SQLiteTaskRepository.create_task`, `get_task`, `record_transition`, `add_attempt`, `add_metric`, `add_audit_event`, and `list_task_events`.
 
-- [ ] **Step 1: Write the failing atomic-transition test**
+The repository contracts are explicit and return `None` for successful writes:
+
+```python
+def add_attempt(self, task_id: UUID, proposal: TestProposal) -> None: ...
+def add_metric(
+    self,
+    task_id: UUID,
+    metric: MetricSnapshot,
+    *,
+    kind: Literal["baseline", "latest"],
+) -> None: ...
+def add_audit_event(self, event: AuditEvent) -> None: ...
+def list_task_events(self, task_id: UUID) -> tuple[AuditEvent, ...]: ...
+```
+
+`add_attempt` appends an immutable proposal snapshot. `add_metric` appends an immutable metric snapshot and atomically updates the matching `TaskRecord.baseline_metrics` or `TaskRecord.latest_metrics` field; any other `kind` is rejected. `add_audit_event` appends the supplied immutable event. Every write validates that the task exists and rolls back completely on failure. Event listing is deterministic by `occurred_at` and then insertion order.
+
+- [x] **Step 1: Write the failing atomic-transition test**
 
 ```python
 from testforge.domain.state_machine import TaskEvent, TaskState
@@ -526,12 +685,12 @@ def test_record_transition_updates_task_and_appends_event_atomically(tmp_path, s
     assert [event.reason for event in repo.list_task_events(sample_task.id)] == ["started"]
 ```
 
-- [ ] **Step 2: Run repository test to verify RED**
+- [x] **Step 2: Run repository test to verify RED**
 
 Run: `python -m pytest tests/unit/persistence/test_repository.py::test_record_transition_updates_task_and_appends_event_atomically -v`  
 Expected: FAIL because the repository does not exist.
 
-- [ ] **Step 3: Implement schema and repository transaction**
+- [x] **Step 3: Implement schema and repository transaction**
 
 ```python
 class SQLiteTaskRepository:
@@ -585,7 +744,7 @@ class AuditEventRow(Base):
     reason: Mapped[str] = mapped_column(String(512), nullable=False)
 ```
 
-- [ ] **Step 4: Add rollback and resume tests**
+- [x] **Step 4: Add rollback and resume tests**
 
 ```python
 def test_failed_event_insert_rolls_back_state(tmp_path, sample_task, monkeypatch):
@@ -600,7 +759,7 @@ def test_failed_event_insert_rolls_back_state(tmp_path, sample_task, monkeypatch
 Run: `python -m pytest tests/unit/persistence -v`  
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit: `git add src/testforge/persistence tests/unit/persistence && git commit -m "feat: persist task state and audit events"`
 
@@ -608,16 +767,31 @@ Commit: `git add src/testforge/persistence tests/unit/persistence && git commit 
 
 ### Task 4: Deterministic Governance Policy
 
+> **Formal completion:** implementer `/root/task04_implementer`; task commits `6a02027` and `2f811ac`; integration merge `38d41c9`; initial and review-fix RED evidence captured; governance suite `35 passed, 2 skipped`, full suite `65 passed, 2 skipped`; independent review approved after cross-platform path findings were fixed and re-reviewed as ADDRESSED.
+
 **Files:**
 - Create: `src/testforge/governance/__init__.py`
 - Create: `src/testforge/governance/policy.py`
 - Create: `tests/unit/governance/test_policy.py`
 
 **Interfaces:**
-- Consumes: `ProjectConfig`, `TaskBudget`, `TestProposal`, `RefactorProposal`, `PolicyViolation`.
+- Consumes: `ProjectConfig`, `TaskBudget`, `BudgetUsage`, `TestProposal`, `RefactorProposal`, `PolicyViolation`.
 - Produces: `GovernancePolicy.validate_read`, `validate_test_proposal`, `validate_refactor_proposal`, and `validate_budget`.
 
-- [ ] **Step 1: Write failing path-escape and source-write tests**
+The public contract is:
+
+```python
+class GovernancePolicy:
+    def __init__(self, config: ProjectConfig, max_patch_bytes: int = 65536, max_patch_lines: int = 600) -> None: ...
+    def validate_read(self, relative_path: str) -> Path: ...
+    def validate_test_proposal(self, proposal: TestProposal) -> Path: ...
+    def validate_refactor_proposal(self, proposal: RefactorProposal) -> Path: ...
+    def validate_budget(self, usage: BudgetUsage, budget: TaskBudget) -> None: ...
+```
+
+All paths are repository-relative and canonicalized before comparison. Test proposals must remain inside `config.tests_root`. Refactor proposals must resolve to exactly `config.target_module`; this method validates eligibility only and never grants approval, which remains Task 5's responsibility. Test content and refactor patches must be non-empty and within both UTF-8 byte and `splitlines()` limits. Empty replacement of an existing file is a deletion attempt. Budget usage at or above any configured attempt, LLM-call, active-time, or mutant limit is rejected with `PolicyViolation`. Unknown tool/action rejection belongs to Task 11's discriminated request adapter and explicit dispatcher registry; Task 4 does not add a stringly typed `validate_action` API.
+
+- [x] **Step 1: Write failing path-escape and source-write tests**
 
 ```python
 def test_rejects_parent_directory_escape(policy):
@@ -631,18 +805,19 @@ def test_rejects_source_write_without_refactor_approval(policy):
         policy.validate_test_proposal(proposal)
 ```
 
-- [ ] **Step 2: Run policy tests to verify RED**
+- [x] **Step 2: Run policy tests to verify RED**
 
 Run: `python -m pytest tests/unit/governance/test_policy.py -v`  
 Expected: FAIL because `GovernancePolicy` does not exist.
 
-- [ ] **Step 3: Implement canonical-path and patch-limit checks**
+- [x] **Step 3: Implement canonical-path and patch-limit checks**
 
 ```python
 class GovernancePolicy:
-    def __init__(self, repository_root: Path, tests_root: Path, max_patch_bytes: int = 65536, max_patch_lines: int = 600):
-        self.repository_root = repository_root.resolve()
-        self.tests_root = tests_root
+    def __init__(self, config: ProjectConfig, max_patch_bytes: int = 65536, max_patch_lines: int = 600):
+        self.repository_root = config.repository_root.resolve()
+        self.tests_root = config.tests_root
+        self.target_module = config.target_module
         self.max_patch_bytes = max_patch_bytes
         self.max_patch_lines = max_patch_lines
 
@@ -661,9 +836,9 @@ class GovernancePolicy:
         return candidate
 ```
 
-- [ ] **Step 4: Add symlink, deletion, unknown-action, and exhausted-budget cases**
+- [x] **Step 4: Add symlink, deletion, refactor-target, and exhausted-budget cases**
 
-Create a real symlink fixture when supported; skip only when the OS denies test symlink creation. Assert resolved symlink escape is rejected. Assert empty replacement of an existing file, undeclared action types, attempt 6, LLM call 7, and active second 2701 are rejected.
+Create a real symlink fixture when supported; skip only when the OS denies test symlink creation. Assert resolved symlink escape is rejected. Assert empty replacement of an existing file, refactor proposals outside the exact configured target module, attempt 6, LLM call 7, active second 2701, and mutant 101 are rejected. Task 11 owns undeclared/unknown tool rejection through its discriminated request adapter and explicit registry.
 
 ```python
 def test_rejects_symlink_escape(policy, tmp_path):
@@ -692,13 +867,15 @@ def test_rejects_empty_replacement_of_existing_test(policy, existing_test):
 Run: `python -m pytest tests/unit/governance -v`  
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit: `git add src/testforge/governance tests/unit/governance && git commit -m "feat: enforce deterministic action policy"`
 
 ---
 
 ### Task 5: Hash-Bound Approvals and Atomic Write-Back
+
+> **Formal completion:** implementer `/root/task05_implementer`; task commits `ca20865` and `384bc77`; integration merge `e2697b5`; lifecycle, filesystem, and review-fix RED evidence captured; Task 5 suite `46 passed, 1 skipped`, full suite `111 passed, 3 skipped`; independent review approved after three concurrency/time findings were fixed and re-reviewed as ADDRESSED.
 
 **Files:**
 - Create: `src/testforge/governance/approval.py`
@@ -710,9 +887,46 @@ Commit: `git add src/testforge/governance tests/unit/governance && git commit -m
 
 **Interfaces:**
 - Consumes: validated proposals from Task 4 and repository events from Task 3.
-- Produces: `sha256_text`, `ApprovalService.request`, `ApprovalService.decide`, and `AtomicPatchApplier.apply_file_replacement`.
+- Produces: `Clock`, `SystemClock`, `sha256_text`, `ApprovalService.request`, `decide`, `require_approved`, repository approval methods, and `AtomicPatchApplier.apply_file_replacement`.
 
-- [ ] **Step 1: Write the failing changed-patch approval test**
+The public contract is:
+
+```python
+class Clock(Protocol):
+    def now(self) -> datetime: ...  # timezone-aware
+
+class ApprovalService:
+    def __init__(self, repository: SQLiteTaskRepository, clock: Clock | None = None) -> None: ...
+    def request(
+        self,
+        kind: Literal["refactor", "apply_tests"],
+        patch: str,
+        expires_at: datetime | None = None,
+    ) -> ApprovalRequest: ...
+    def decide(self, approval_id: UUID, approved: bool, patch_hash: str, actor: str) -> ApprovalRequest: ...
+    def require_approved(self, approval_id: UUID, patch: str) -> ApprovalRequest: ...
+
+class SQLiteTaskRepository:
+    def create_approval(self, request: ApprovalRequest) -> None: ...
+    def get_approval(self, approval_id: UUID) -> ApprovalRequest: ...
+    def update_approval(self, request: ApprovalRequest) -> None: ...
+    def compare_and_set_approval(
+        self,
+        request: ApprovalRequest,
+        *,
+        expected_status: ApprovalStatus,
+    ) -> bool: ...
+```
+
+`SystemClock` returns UTC-aware time. Every service operation rejects a naive clock value with `InputError`; `request` stamps `created_at` from the injected clock and `decide` stamps `decided_at` from it, normalizing aware values to UTC. `request` defaults to no expiry; a supplied expiry must be timezone-aware and later than the current clock value. Missing or duplicate approval IDs raise `InputError`. Repository updates preserve immutable identity, kind, patch hash, and creation time. Only `PENDING` requests may be decided initially. Repeating the same decision with the same hash and actor returns the stored request without changing `decided_at`; a conflicting repeat raises `PolicyViolation`. Before `decide` or `require_approved`, an expired request is persisted as `EXPIRED` and rejected. `require_approved` validates approved status, expiry, and the SHA-256 of the current patch.
+
+`AtomicPatchApplier` is deliberately separate from approval checking; callers must invoke `require_approved` first. It accepts only a 64-character lowercase hexadecimal expected hash and a regular-file or nonexistent target. It rejects symlinks and directories, treats a missing file as empty content, reads UTF-8 with `newline=""` so newline bytes are not normalized, and never creates the parent directory. It writes a same-directory temporary file with `newline=""`, flushes and `fsync`s it, uses `os.replace`, and removes the temporary file after any failure.
+
+Repository approval writes reject naive datetimes and normalize every aware timestamp to UTC at the persistence boundary, including direct repository calls. `compare_and_set_approval` performs one transactional `UPDATE ... WHERE id = ? AND status = ?`, preserves immutable fields, and returns whether exactly one row changed. `ApprovalService.decide` and expiry transitions use it; after a false result they reload to return an exact idempotent decision or reject a conflict.
+
+`AtomicPatchApplier(repository_root)` uses a project-level cooperative OS lock that serializes TestForge writers across processes and is released automatically when the owning process exits. While holding it, the applier records the initial target identity/type/hash, writes and syncs the temporary file, then immediately before `os.replace` rechecks that the target is still the same object with the same exact hash (or is still absent). Any difference raises `StaleWorkspaceError`. CLI/WebUI must show a short "do not edit the target" state during this section. Portable filesystems provide no atomic content compare-and-swap against non-cooperating editors; an external write in the final check/replace micro-window is a documented residual race, not a claimed guarantee.
+
+- [x] **Step 1: Write the failing changed-patch approval test**
 
 ```python
 def test_approval_is_valid_only_for_exact_patch(approval_service):
@@ -722,12 +936,12 @@ def test_approval_is_valid_only_for_exact_patch(approval_service):
         approval_service.require_approved(request.id, patch="changed")
 ```
 
-- [ ] **Step 2: Run approval test to verify RED**
+- [x] **Step 2: Run approval test to verify RED**
 
 Run: `python -m pytest tests/unit/governance/test_approval.py -v`  
 Expected: FAIL because approval support does not exist.
 
-- [ ] **Step 3: Implement hash-bound decisions**
+- [x] **Step 3: Implement hash-bound decisions**
 
 ```python
 def sha256_text(value: str) -> str:
@@ -754,7 +968,9 @@ class ApprovalService:
         return request
 ```
 
-- [ ] **Step 4: Write RED/GREEN tests for stale-safe atomic write-back**
+- [x] **Step 4: Write RED/GREEN tests for stale-safe atomic write-back**
+
+Also cover injected-clock timestamps and expiry, naive-clock rejection, identical-decision idempotency, conflicting concurrent decisions, missing/duplicate approval IDs, non-UTC and naive repository-boundary timestamps, repository restart persistence, CRLF-sensitive hashing, invalid expected hashes, missing parents, directory/symlink rejection, cooperative lock acquisition, an edit between temporary-file creation and the final recheck, successful replacement, and temporary-file cleanup on failure.
 
 ```python
 def test_apply_rejects_changed_destination(tmp_path, applier, approved_patch):
@@ -784,13 +1000,15 @@ class AtomicPatchApplier:
             temporary.unlink(missing_ok=True)
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit: `git add src/testforge/governance src/testforge/persistence tests/unit/governance && git commit -m "feat: bind approvals to atomic patches"`
 
 ---
 
 ### Task 6: Provider-Neutral LLM Contract and Scripted Mock
+
+> **Formal completion:** implementer `/root/task06_implementer`; task commit `3e1f6e3`; integration merge `42f1dba`; initial and extended RED evidence captured; focused suite `7 passed`, full suite `118 passed, 3 skipped`; independent review approved with no findings and controller verification passed.
 
 **Files:**
 - Create: `src/testforge/llm/__init__.py`
@@ -800,9 +1018,29 @@ Commit: `git add src/testforge/governance src/testforge/persistence tests/unit/g
 
 **Interfaces:**
 - Consumes: `TestProposal`, `RefactorProposal`, `FeedbackPacket` from Task 2.
-- Produces: `GenerationContext`, `LLMClient` protocol, `LLMResponse`, and `MockLLMClient` with recorded calls.
+- Produces: immutable `GenerationContext`, `LLMCall`, `LLMClient` protocol, `LLMResponse`, and `MockLLMClient` with read-only recorded calls.
 
-- [ ] **Step 1: Write the failing scripted-response test**
+The shared contract is:
+
+```python
+class GenerationContext(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    target_module: str = Field(min_length=1)
+    source: str
+    existing_tests: str
+    baseline: MetricSnapshot | None = None
+    constraints: tuple[str, ...] = ()
+    memory: tuple[str, ...] = ()
+
+class LLMCall(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    context: GenerationContext
+    feedback: FeedbackPacket | None = None
+```
+
+`LLMResponse` is frozen and contains exactly one of `test` or `refactor`. `MockLLMClient` copies the supplied response sequence into a tuple and exposes `calls` as a tuple, backed by a private mutable list. Every invocation records an immutable `LLMCall`, including an exhausted invocation; exhaustion does not advance the response index and always raises `LLMError("mock script exhausted")`. The first release follows the approved single-task sequential execution model and does not promise ordering for concurrent calls. Complete source is transient context only and must not be persisted to structured memory or audit logs.
+
+- [x] **Step 1: Write the failing scripted-response test**
 
 ```python
 def test_mock_returns_script_in_order_and_records_feedback():
@@ -814,12 +1052,12 @@ def test_mock_returns_script_in_order_and_records_feedback():
     assert client.calls[1].feedback.failure_category == "surviving_mutant"
 ```
 
-- [ ] **Step 2: Run mock test to verify RED**
+- [x] **Step 2: Run mock test to verify RED**
 
 Run: `python -m pytest tests/unit/llm/test_mock.py -v`  
 Expected: FAIL because LLM modules do not exist.
 
-- [ ] **Step 3: Implement protocol and discriminated response schema**
+- [x] **Step 3: Implement protocol and discriminated response schema**
 
 ```python
 class LLMClient(Protocol):
@@ -839,19 +1077,23 @@ class LLMResponse(BaseModel):
         return self
 ```
 
-- [ ] **Step 4: Implement exhausted-script and immutability cases**
+- [x] **Step 4: Implement exhausted-script and immutability cases**
 
 `MockLLMClient.generate` pops no data; it advances an index, records immutable call snapshots, and raises `LLMError("mock script exhausted")` after the last response. Run `python -m pytest tests/unit/llm -v`. Expected: PASS.
 
 ```python
 class MockLLMClient:
     def __init__(self, responses: Sequence[LLMResponse]) -> None:
-        self.responses = tuple(responses)
-        self.calls: list[LLMCall] = []
+        self.responses: tuple[LLMResponse, ...] = tuple(responses)
+        self._calls: list[LLMCall] = []
         self._index = 0
 
+    @property
+    def calls(self) -> tuple[LLMCall, ...]:
+        return tuple(self._calls)
+
     def generate(self, context: GenerationContext, feedback: FeedbackPacket | None) -> LLMResponse:
-        self.calls.append(LLMCall(context=context, feedback=feedback))
+        self._calls.append(LLMCall(context=context, feedback=feedback))
         if self._index >= len(self.responses):
             raise LLMError("mock script exhausted")
         response = self.responses[self._index]
@@ -859,13 +1101,15 @@ class MockLLMClient:
         return response
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit: `git add src/testforge/llm tests/unit/llm && git commit -m "feat: add provider-neutral scripted LLM"`
 
 ---
 
 ### Task 7: Analyzer Result Models and Deterministic Parsers
+
+> **Formal completion:** implementer `/root/task07_implementer`; task commits `e718e57` and `e850e36`; integration merge `c1d5f2e`; initial, self-review, and review-fix RED evidence captured; focused suite `52 passed`, full suite `170 passed, 3 skipped`; independent review approved after all five parser findings were fixed and re-reviewed as ADDRESSED. One additional namespaced-JUnit fixture was added to cover the approved namespace regression.
 
 **Files:**
 - Create: `src/testforge/tools/__init__.py`
@@ -878,9 +1122,50 @@ Commit: `git add src/testforge/llm tests/unit/llm && git commit -m "feat: add pr
 
 **Interfaces:**
 - Consumes: `MetricSnapshot`, `ToolExecutionError`.
-- Produces: `CommandResult`, `PytestResult`, `CoverageResult`, `MutationResult`, `parse_pytest_json`, `parse_coverage_json`, `parse_mutmut_junit`, and `metric_snapshot_from_results`.
+- Produces: immutable `CommandResult`, `PytestResult`, `CoverageResult`, `MutationResult`, `MutationRunOutcome`, strict parser functions, and `metric_snapshot_from_results`.
 
-- [ ] **Step 1: Write failing fixture parser tests**
+The public result contract is:
+
+```python
+class CommandResult(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    exit_code: int
+    stdout: str = ""
+    stderr: str = ""
+    def diagnostic_summary(self, workspace_root: Path | None = None) -> str: ...
+
+class PytestResult(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    passed: int = Field(ge=0)
+    failed: int = Field(ge=0)
+    skipped: int = Field(ge=0)
+    errors: int = Field(default=0, ge=0)
+
+class CoverageResult(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    branch_percent: float = Field(ge=0, le=100)
+    missing_lines: tuple[int, ...] = ()
+    missing_branches: tuple[tuple[int, int], ...] = ()
+
+class MutationRunOutcome(StrEnum):
+    COMPLETED = "completed"
+    UNSUPPORTED = "unsupported"
+    TIMEOUT = "timeout"
+
+class MutationResult(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    supported: bool
+    total: int = Field(ge=0)
+    killed: int = Field(ge=0)
+    survived: int = Field(ge=0)
+    errors: int = Field(ge=0)
+```
+
+For supported mutation results, `total == killed + survived + errors`; unsupported results require every count to be zero. `parse_mutmut_junit(raw, outcome=MutationRunOutcome.COMPLETED)` returns the zero unsupported result only for explicit `UNSUPPORTED`, raises `ToolExecutionError("mutation tool timed out")` for `TIMEOUT`, and parses XML only for `COMPLETED`. Pytest/coverage parsers accept only their documented machine fields and raise stable errors without embedding raw input. `metric_snapshot_from_results` adds pytest `errors` to `tests_failed`; unsupported mutation maps to `mutation_status="unsupported"`, while timeout never masquerades as unsupported.
+
+`CommandResult.diagnostic_summary` owns redaction. It leaves raw `stdout`/`stderr` unchanged, case-insensitively replaces the supplied workspace root in native, slash, and backslash forms with `<workspace>`, replaces case-sensitive tokens matching `sk-[A-Za-z0-9_-]+` with `<redacted>`, and performs all redaction before truncation. It retains at most 2000 redacted characters from each stream and appends `…<truncated>` when truncated. Its deterministic format includes exit code plus labeled stdout/stderr sections and never raises due to a missing workspace root.
+
+- [x] **Step 1: Write failing fixture parser tests**
 
 ```python
 def test_parse_tools_into_one_metric_snapshot(fixture_text):
@@ -893,12 +1178,12 @@ def test_parse_tools_into_one_metric_snapshot(fixture_text):
     assert (snapshot.mutants_total, snapshot.mutants_killed, snapshot.mutants_survived) == (4, 3, 1)
 ```
 
-- [ ] **Step 2: Run parser tests to verify RED**
+- [x] **Step 2: Run parser tests to verify RED**
 
 Run: `python -m pytest tests/unit/tools/test_parsers.py -v`  
 Expected: FAIL because result parsers do not exist.
 
-- [ ] **Step 3: Implement strict parsers using documented JSON fields**
+- [x] **Step 3: Implement strict parsers using documented JSON fields**
 
 ```python
 def parse_coverage_json(raw: str, target: str) -> CoverageResult:
@@ -925,7 +1210,14 @@ def parse_pytest_json(raw: str) -> PytestResult:
         raise ToolExecutionError("invalid pytest JSON") from exc
 
 
-def parse_mutmut_junit(raw: str) -> MutationResult:
+def parse_mutmut_junit(
+    raw: str,
+    outcome: MutationRunOutcome = MutationRunOutcome.COMPLETED,
+) -> MutationResult:
+    if outcome is MutationRunOutcome.UNSUPPORTED:
+        return MutationResult(supported=False, total=0, killed=0, survived=0, errors=0)
+    if outcome is MutationRunOutcome.TIMEOUT:
+        raise ToolExecutionError("mutation tool timed out")
     try:
         root = ElementTree.fromstring(raw)
         cases = root.findall(".//testcase")
@@ -940,7 +1232,7 @@ def parse_mutmut_junit(raw: str) -> MutationResult:
 def metric_snapshot_from_results(pytest_result: PytestResult, coverage_result: CoverageResult, mutation_result: MutationResult) -> MetricSnapshot:
     return MetricSnapshot(
         tests_passed=pytest_result.passed,
-        tests_failed=pytest_result.failed,
+        tests_failed=pytest_result.failed + pytest_result.errors,
         tests_skipped=pytest_result.skipped,
         branch_coverage=coverage_result.branch_percent,
         mutants_total=mutation_result.total,
@@ -950,14 +1242,14 @@ def metric_snapshot_from_results(pytest_result: PytestResult, coverage_result: C
     )
 ```
 
-- [ ] **Step 4: Add malformed, timeout, unsupported-mutation, and redaction cases**
+- [x] **Step 4: Add malformed, timeout, unsupported-mutation, and redaction cases**
 
 Assert malformed JSON raises `ToolExecutionError`; explicit `unsupported` produces `MutationResult(supported=False)`; timeout remains an error rather than unsupported; absolute workspace paths and values matching `sk-*` are redacted from diagnostic summaries.
 
 Run: `python -m pytest tests/unit/tools -v`  
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit: `git add src/testforge/tools tests/unit/tools tests/fixtures/tool_output && git commit -m "feat: parse deterministic test feedback"`
 
@@ -976,7 +1268,7 @@ Commit: `git add src/testforge/tools tests/unit/tools tests/fixtures/tool_output
 - Consumes: `MetricSnapshot`, analyzer results, `QualityThreshold`, and attempt history.
 - Produces: `QualityDecision`, `QualityGate.evaluate`, and `FeedbackEngine.build`.
 
-- [ ] **Step 1: Write failing mutation-success and coverage-fallback tests**
+- [x] **Step 1: Write failing mutation-success and coverage-fallback tests**
 
 ```python
 def test_mutation_gate_requires_new_kill_and_five_points(gate):
@@ -993,12 +1285,12 @@ def test_timeout_does_not_activate_coverage_fallback(gate):
     assert decision.reason == "mutation_tool_error"
 ```
 
-- [ ] **Step 2: Run quality tests to verify RED**
+- [x] **Step 2: Run quality tests to verify RED**
 
 Run: `python -m pytest tests/unit/feedback/test_quality_gate.py -v`  
 Expected: FAIL because `QualityGate` does not exist.
 
-- [ ] **Step 3: Implement ordered quality checks**
+- [x] **Step 3: Implement ordered quality checks**
 
 ```python
 class QualityGate:
@@ -1018,7 +1310,7 @@ class QualityGate:
         return QualityDecision.failed("mutation_tool_error")
 ```
 
-- [ ] **Step 4: Write RED/GREEN feedback packet and stagnation tests**
+- [x] **Step 4: Write RED/GREEN feedback packet and stagnation tests**
 
 ```python
 def test_surviving_mutant_feedback_names_mutant_and_changes_constraint(engine):
@@ -1050,7 +1342,7 @@ class FeedbackEngine:
         return FeedbackPacket(failure_category=category, surviving_mutants=surviving_mutants, constraints_for_next_attempt=constraints, stagnated=stagnated)
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit: `git add src/testforge/feedback tests/unit/feedback && git commit -m "feat: drive generation with quality feedback"`
 
@@ -1068,7 +1360,7 @@ Commit: `git add src/testforge/feedback tests/unit/feedback && git commit -m "fe
 - Consumes: persisted `MemoryEntry` records and current target/failure tags.
 - Produces: `ProjectMemory.remember`, `select`, `list_entries`, and `clear_project`.
 
-- [ ] **Step 1: Write failing project-isolation and bounded-selection tests**
+- [x] **Step 1: Write failing project-isolation and bounded-selection tests**
 
 ```python
 def test_memory_selects_only_same_project_matching_tags(memory):
@@ -1082,12 +1374,12 @@ def test_memory_rejects_source_or_secret_shaped_content(memory):
         memory.remember("project-a", kind="strategy", tags=(), summary="sk-secret-value")
 ```
 
-- [ ] **Step 2: Run memory tests to verify RED**
+- [x] **Step 2: Run memory tests to verify RED**
 
 Run: `python -m pytest tests/unit/test_memory.py -v`  
 Expected: FAIL because `ProjectMemory` does not exist.
 
-- [ ] **Step 3: Implement deterministic tagged selection**
+- [x] **Step 3: Implement deterministic tagged selection**
 
 ```python
 class ProjectMemory:
@@ -1106,7 +1398,7 @@ class ProjectMemory:
 
 Reject summaries over 2,000 characters, secret-like patterns, and payloads marked as complete source or complete prompt.
 
-- [ ] **Step 4: Add expiry, version, clear, and capacity tests**
+- [x] **Step 4: Add expiry, version, clear, and capacity tests**
 
 Assert expired records are excluded, newer versions supersede older entries with the same key, `clear_project` removes only that project, and at most 500 active entries remain after insertion.
 
@@ -1129,7 +1421,7 @@ def test_clear_is_project_scoped(memory):
 Run: `python -m pytest tests/unit/test_memory.py -v`  
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit: `git add src/testforge/memory.py src/testforge/persistence tests/unit/test_memory.py && git commit -m "feat: add bounded structured project memory"`
 
@@ -1153,7 +1445,7 @@ Commit: `git add src/testforge/memory.py src/testforge/persistence tests/unit/te
 - Consumes: `TaskBudget`, `CommandResult`, `SandboxError`, a user-confirmed trusted project root, and its dependency files.
 - Produces: `ProjectImageBuilder.fingerprint`, `build`, `DockerSandboxRunner.run(argv, workspace, timeout_seconds) -> CommandResult`, and `cleanup()`.
 
-- [ ] **Step 1: Write the failing dependency-image fingerprint and final-image boundary tests**
+- [x] **Step 1: Write the failing dependency-image fingerprint and final-image boundary tests**
 
 ```python
 def test_dependency_fingerprint_changes_with_pyproject(tmp_path, image_builder):
@@ -1173,12 +1465,12 @@ def test_generated_final_stage_copies_venv_but_not_project_source(image_builder,
     assert "COPY ." not in final_stage
 ```
 
-- [ ] **Step 2: Run image-builder tests to verify RED**
+- [x] **Step 2: Run image-builder tests to verify RED**
 
 Run: `python -m pytest tests/unit/sandbox/test_image_builder.py -v`  
 Expected: FAIL because `ProjectImageBuilder` does not exist.
 
-- [ ] **Step 3: Implement a local-only multi-stage project image build**
+- [x] **Step 3: Implement a local-only multi-stage project image build**
 
 ```dockerfile
 FROM python:3.12-slim AS builder
@@ -1199,12 +1491,12 @@ WORKDIR /workspace
 
 `ProjectImageBuilder.build` uses a tag `testforge-project:<dependency fingerprint>`, requires an explicit `trusted_project=True` argument from the application layer, records that the build may access package indexes and execute the project's build backend, and never pushes the image. Reject `.env`, `.git`, key files, and user-home content from the build context.
 
-- [ ] **Step 4: Run image-builder tests to verify GREEN**
+- [x] **Step 4: Run image-builder tests to verify GREEN**
 
 Run: `python -m pytest tests/unit/sandbox/test_image_builder.py -v`  
 Expected: PASS.
 
-- [ ] **Step 5: Write the failing Docker option test with a fake client**
+- [x] **Step 5: Write the failing Docker option test with a fake client**
 
 ```python
 def test_container_is_non_root_offline_and_resource_limited(tmp_path, fake_docker_client):
@@ -1219,12 +1511,12 @@ def test_container_is_non_root_offline_and_resource_limited(tmp_path, fake_docke
     assert "/var/run/docker.sock" not in repr(options["volumes"])
 ```
 
-- [ ] **Step 6: Run sandbox unit test to verify RED**
+- [x] **Step 6: Run sandbox unit test to verify RED**
 
 Run: `python -m pytest tests/unit/sandbox/test_docker_runner.py -v`  
 Expected: FAIL because the sandbox runner does not exist.
 
-- [ ] **Step 7: Implement container lifecycle and timeout cleanup**
+- [x] **Step 7: Implement container lifecycle and timeout cleanup**
 
 ```python
 class DockerSandboxRunner:
@@ -1263,7 +1555,7 @@ class DockerSandboxRunner:
             container.remove(force=True)
 ```
 
-- [ ] **Step 8: Add timeout/cleanup unit cases and a tagged real-container integration test**
+- [x] **Step 8: Add timeout/cleanup unit cases and a tagged real-container integration test**
 
 ```python
 @pytest.mark.docker
@@ -1282,7 +1574,7 @@ Expected: PASS.
 Run: `python -m pytest tests/integration/sandbox -m docker -v`  
 Expected when Docker is available: PASS.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 Commit: `git add src/testforge/sandbox docker tests/unit/sandbox tests/integration/sandbox tests/fixtures/projects/simple_math && git commit -m "feat: build and isolate project test environments"`
 
@@ -1298,7 +1590,9 @@ Commit: `git add src/testforge/sandbox docker tests/unit/sandbox tests/integrati
 - Consumes: `GovernancePolicy`, `DockerSandboxRunner`, parser functions, and proposal/result models.
 - Produces: `ToolName`, validated `ToolRequest` models, and `DomainToolDispatcher.dispatch(request) -> ToolResult`.
 
-- [ ] **Step 1: Write failing unknown-tool and valid-pytest dispatch tests**
+**Ownership clarification:** this task exclusively owns undeclared/unknown tool and action rejection. Raw action payloads must pass the discriminated `ToolRequest` adapter and the explicit handler registry; no generic string action validator is added to `GovernancePolicy`.
+
+- [x] **Step 1: Write failing unknown-tool and valid-pytest dispatch tests**
 
 ```python
 def test_unknown_tool_is_rejected(dispatcher):
@@ -1311,12 +1605,12 @@ def test_run_pytest_uses_fixed_argv(dispatcher, sandbox):
     assert sandbox.last_argv == ("python", "-m", "pytest", "--json-report", "--json-report-file=/tmp/pytest.json", "-q")
 ```
 
-- [ ] **Step 2: Run dispatcher tests to verify RED**
+- [x] **Step 2: Run dispatcher tests to verify RED**
 
 Run: `python -m pytest tests/unit/tools/test_dispatcher.py -v`  
 Expected: FAIL because the dispatcher does not exist.
 
-- [ ] **Step 3: Implement discriminated requests and explicit registry**
+- [x] **Step 3: Implement discriminated requests and explicit registry**
 
 ```python
 class ToolName(StrEnum):
@@ -1348,7 +1642,7 @@ class DomainToolDispatcher:
 
 Hard-code analyzer argument vectors in handlers. Never concatenate user strings into a command.
 
-- [ ] **Step 4: Add read/write/refactor/export policy tests**
+- [x] **Step 4: Add read/write/refactor/export policy tests**
 
 Assert every handler invokes the corresponding `GovernancePolicy` check, never returns complete source in an audit event, and refuses a refactor application without a matching approval ID and patch hash.
 
@@ -1368,7 +1662,7 @@ def test_audit_result_contains_hash_not_complete_source(dispatcher, source_reque
 Run: `python -m pytest tests/unit/tools -v`  
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit: `git add src/testforge/tools/dispatcher.py tests/unit/tools/test_dispatcher.py && git commit -m "feat: dispatch allowlisted test tools"`
 
@@ -1387,7 +1681,7 @@ Commit: `git add src/testforge/tools/dispatcher.py tests/unit/tools/test_dispatc
 - Consumes: repository, state machine, LLM, dispatcher, feedback, quality gate, memory, governance, and approvals.
 - Produces: `ContextBuilder.build`, `AgentEngine.advance(task_id)`, `run_until_blocked(task_id)`, `resume(task_id, approval_id)`, `ApplicationService` use cases, and `build_application` composition root.
 
-- [ ] **Step 1: Write the failing one-transition-per-advance test**
+- [x] **Step 1: Write the failing one-transition-per-advance test**
 
 ```python
 def test_advance_is_persisted_and_idempotent(engine, repo, created_task):
@@ -1398,12 +1692,12 @@ def test_advance_is_persisted_and_idempotent(engine, repo, created_task):
     assert len(repo.list_task_events(created_task.id)) == 1
 ```
 
-- [ ] **Step 2: Run engine unit test to verify RED**
+- [x] **Step 2: Run engine unit test to verify RED**
 
 Run: `python -m pytest tests/unit/test_engine.py -v`  
 Expected: FAIL because `AgentEngine` does not exist.
 
-- [ ] **Step 3: Implement explicit state handlers**
+- [x] **Step 3: Implement explicit state handlers**
 
 ```python
 class AgentEngine:
@@ -1483,7 +1777,7 @@ class ContextBuilder:
         )
 ```
 
-- [ ] **Step 4: Write the failing full mock-loop mechanism test**
+- [x] **Step 4: Write the failing full mock-loop mechanism test**
 
 ```python
 def test_surviving_mutant_feedback_changes_second_llm_action(mock_loop):
@@ -1498,7 +1792,7 @@ def test_surviving_mutant_feedback_changes_second_llm_action(mock_loop):
 
 Build the fixture with scripted analyzer results: baseline has one surviving mutant, attempt one leaves it alive, attempt two kills it. Add tests for `NO_ACTION_NEEDED`, two-round stagnation, budget exhaustion, refactor pause/resume, apply pause, cancellation, and stale workspace.
 
-- [ ] **Step 5: Run complete engine tests and commit**
+- [x] **Step 5: Run complete engine tests and commit**
 
 Run: `python -m pytest tests/unit/test_engine.py tests/integration/test_mock_loop.py -v`  
 Expected: PASS.  
@@ -1516,7 +1810,7 @@ Commit: `git add src/testforge/context.py src/testforge/engine.py src/testforge/
 - Consumes: OS keyring backend and optional environment mapping.
 - Produces: `CredentialStore.set`, `status`, `get`, `clear`, and `CredentialStatus`.
 
-- [ ] **Step 1: Write failing no-plaintext-status and keyring tests**
+- [x] **Step 1: Write failing no-plaintext-status and keyring tests**
 
 ```python
 def test_status_never_returns_secret(fake_keyring):
@@ -1528,12 +1822,12 @@ def test_status_never_returns_secret(fake_keyring):
     assert fake_keyring.saved == ("testforge", "openai", "sk-example-not-real")
 ```
 
-- [ ] **Step 2: Run credential tests to verify RED**
+- [x] **Step 2: Run credential tests to verify RED**
 
 Run: `python -m pytest tests/unit/test_credentials.py -v`  
 Expected: FAIL because `CredentialStore` does not exist.
 
-- [ ] **Step 3: Implement keyring-first storage and explicit dotenv fallback**
+- [x] **Step 3: Implement keyring-first storage and explicit dotenv fallback**
 
 ```python
 class CredentialStore:
@@ -1566,7 +1860,7 @@ class CredentialStore:
             return
 ```
 
-- [ ] **Step 4: Add clear, missing-key, explicit-fallback, and redaction tests**
+- [x] **Step 4: Add clear, missing-key, explicit-fallback, and redaction tests**
 
 Assert environment values are ignored unless `allow_dotenv=True`; exception and status representations contain no secret; clear is idempotent when the backend reports a missing entry.
 
@@ -1587,7 +1881,7 @@ def test_clear_missing_credential_is_idempotent(fake_keyring):
 Run: `python -m pytest tests/unit/test_credentials.py -v`  
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit: `git add src/testforge/credentials.py tests/unit/test_credentials.py && git commit -m "feat: manage API keys with OS keyring"`
 
@@ -1603,7 +1897,7 @@ Commit: `git add src/testforge/credentials.py tests/unit/test_credentials.py && 
 - Consumes: `LLMClient`, `GenerationContext`, `FeedbackPacket`, `LLMResponse`, and `CredentialStore`.
 - Produces: `OpenAIClient.generate` with normalized `LLMError` failures.
 
-- [ ] **Step 1: Write the failing structured-response adapter test**
+- [x] **Step 1: Write the failing structured-response adapter test**
 
 ```python
 def test_openai_adapter_requests_validated_llm_response(fake_openai, credential_store):
@@ -1616,12 +1910,12 @@ def test_openai_adapter_requests_validated_llm_response(fake_openai, credential_
     assert "shell" not in call["input"]
 ```
 
-- [ ] **Step 2: Run adapter test to verify RED**
+- [x] **Step 2: Run adapter test to verify RED**
 
 Run: `python -m pytest tests/unit/llm/test_openai_adapter.py -v`  
 Expected: FAIL because the OpenAI adapter does not exist.
 
-- [ ] **Step 3: Implement Responses API structured parsing behind the provider-neutral interface**
+- [x] **Step 3: Implement Responses API structured parsing behind the provider-neutral interface**
 
 ```python
 class OpenAIClient:
@@ -1645,7 +1939,7 @@ class OpenAIClient:
 
 `_build_input` includes target summaries, constraints, selected memory, baseline, and feedback but no key, full repository, or arbitrary tool descriptions.
 
-- [ ] **Step 4: Add authentication, rate-limit, timeout, refusal, invalid-schema, and secret-redaction tests**
+- [x] **Step 4: Add authentication, rate-limit, timeout, refusal, invalid-schema, and secret-redaction tests**
 
 Use fake SDK exceptions; assert each becomes one of `authentication`, `rate_limit`, `timeout`, `refusal`, or `invalid_response` without provider message text that could contain a credential.
 
@@ -1665,7 +1959,7 @@ def test_provider_errors_are_normalized_without_message(fake_openai, credential_
 Run: `python -m pytest tests/unit/llm -v`  
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit: `git add src/testforge/llm/openai_adapter.py tests/unit/llm/test_openai_adapter.py && git commit -m "feat: add OpenAI structured-output adapter"`
 
@@ -1682,7 +1976,7 @@ Commit: `git add src/testforge/llm/openai_adapter.py tests/unit/llm/test_openai_
 - Consumes: `ApplicationService` and `CredentialStore`.
 - Produces: `testforge init`, `credentials set|status|clear`, `run`, `status`, `approve`, `reject`, `apply`, `history`, and `serve` commands.
 
-- [ ] **Step 1: Write failing init/run/status CLI tests**
+- [x] **Step 1: Write failing init/run/status CLI tests**
 
 ```python
 def test_run_prints_task_id_without_secret(cli_runner, app, monkeypatch):
@@ -1700,12 +1994,12 @@ def test_init_requires_explicit_trust_before_dependency_build(cli_runner, app, m
     assert app.project_image_builds == []
 ```
 
-- [ ] **Step 2: Run CLI tests to verify RED**
+- [x] **Step 2: Run CLI tests to verify RED**
 
 Run: `python -m pytest tests/unit/test_cli.py -v`  
 Expected: FAIL because CLI does not exist.
 
-- [ ] **Step 3: Implement commands as thin application-service calls**
+- [x] **Step 3: Implement commands as thin application-service calls**
 
 ```python
 cli = typer.Typer(no_args_is_help=True)
@@ -1737,7 +2031,7 @@ def credential_set(provider: str = "openai") -> None:
 
 Add `[project.scripts] testforge = "testforge.cli:cli"` to `pyproject.toml`.
 
-- [ ] **Step 4: Add approval, stale, cancellation, history, and credential-output tests**
+- [x] **Step 4: Add approval, stale, cancellation, history, and credential-output tests**
 
 Assert approval commands require UUIDs, show patch hashes but not full source, rejected approvals resume correctly, and `credentials status` prints configured/source only.
 
@@ -1758,7 +2052,7 @@ def test_reject_requires_valid_approval_uuid(cli_runner):
 Run: `python -m pytest tests/unit/test_cli.py -v`  
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit: `git add src/testforge/cli.py tests/unit/test_cli.py pyproject.toml && git commit -m "feat: expose TestForge CLI workflows"`
 
@@ -1781,7 +2075,7 @@ Commit: `git add src/testforge/cli.py tests/unit/test_cli.py pyproject.toml && g
 - Consumes: `ApplicationService` DTOs only.
 - Produces: HTML routes for task creation, task detail, approval decisions, settings status, and memory clearing.
 
-- [ ] **Step 1: Write failing route-boundary tests**
+- [x] **Step 1: Write failing route-boundary tests**
 
 ```python
 def test_task_detail_shows_metrics_and_never_secret(test_client, fake_app):
@@ -1792,12 +2086,12 @@ def test_task_detail_shows_metrics_and_never_secret(test_client, fake_app):
     assert "sk-example" not in response.text
 ```
 
-- [ ] **Step 2: Run Web route tests to verify RED**
+- [x] **Step 2: Run Web route tests to verify RED**
 
 Run: `python -m pytest tests/unit/web/test_routes.py -v`  
 Expected: FAIL because Web app does not exist.
 
-- [ ] **Step 3: Implement app factory and server-rendered routes**
+- [x] **Step 3: Implement app factory and server-rendered routes**
 
 ```python
 def create_app(application: ApplicationService, demo_mode: bool = False) -> FastAPI:
@@ -1818,7 +2112,7 @@ def create_app(application: ApplicationService, demo_mode: bool = False) -> Fast
     return app
 ```
 
-- [ ] **Step 4: Add CSRF token, invalid UUID, stale approval, memory-clear, accessibility, and local-static tests**
+- [x] **Step 4: Add CSRF token, invalid UUID, stale approval, memory-clear, accessibility, and local-static tests**
 
 Assert every mutation form requires a session CSRF token; templates have labels, headings, keyboard-focus styles, textual state indicators, and no color-only meaning; HTMX is served locally with its license.
 
@@ -1838,7 +2132,7 @@ def test_task_page_uses_local_htmx_and_accessible_status(test_client, fake_app):
 Run: `python -m pytest tests/unit/web -v`  
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit: `git add src/testforge/web tests/unit/web && git commit -m "feat: add local task and approval WebUI"`
 
@@ -1857,7 +2151,7 @@ Commit: `git add src/testforge/web tests/unit/web && git commit -m "feat: add lo
 - Consumes: `MockLLMClient`, fixture analyzer results, Web app factory.
 - Produces: `DemoScenario`, `DemoApplicationFactory`, and demo-only routes that cannot accept external code or credentials.
 
-- [ ] **Step 1: Write failing demo boundary test**
+- [x] **Step 1: Write failing demo boundary test**
 
 ```python
 def test_demo_mode_rejects_repository_upload_url_and_credentials(demo_client):
@@ -1867,12 +2161,12 @@ def test_demo_mode_rejects_repository_upload_url_and_credentials(demo_client):
     assert "api_key" in response.text
 ```
 
-- [ ] **Step 2: Run demo tests to verify RED**
+- [x] **Step 2: Run demo tests to verify RED**
 
 Run: `python -m pytest tests/unit/web/test_demo_mode.py -v`  
 Expected: FAIL because demo mode does not exist.
 
-- [ ] **Step 3: Implement closed fixture registry and demo factory**
+- [x] **Step 3: Implement closed fixture registry and demo factory**
 
 ```python
 class DemoTaskRequest(BaseModel):
@@ -1909,7 +2203,7 @@ class DemoApplicationFactory:
 
 The request schema contains only `scenario`; FastAPI must reject every extra field.
 
-- [ ] **Step 4: Add end-to-end weak-test → feedback → strong-test → approval test**
+- [x] **Step 4: Add end-to-end weak-test → feedback → strong-test → approval test**
 
 Use `TestClient` to select `weak-then-strong`, advance the task, assert the timeline contains one surviving-mutant feedback event, approve the final test diff, and assert the demo records a simulated write-back without touching disk.
 
@@ -1928,7 +2222,7 @@ def test_weak_then_strong_demo_reaches_apply_approval_without_disk_write(demo_cl
 Run: `python -m pytest tests/unit/web/test_demo_mode.py tests/e2e/test_demo_flow.py -v`  
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit: `git add src/testforge/demo.py tests/fixtures/demo tests/unit/web/test_demo_mode.py tests/e2e/test_demo_flow.py && git commit -m "feat: add closed public mock demonstration"`
 
@@ -1944,7 +2238,7 @@ Commit: `git add src/testforge/demo.py tests/fixtures/demo tests/unit/web/test_d
 - Consumes: `DemoApplicationFactory`, `GovernancePolicy`, and mock-loop fixtures.
 - Produces: a network-free executable demonstration with stable JSON output.
 
-- [ ] **Step 1: Write the failing demonstration contract test**
+- [x] **Step 1: Write the failing demonstration contract test**
 
 ```python
 def test_demo_reports_all_required_mechanisms(run_demo):
@@ -1956,12 +2250,12 @@ def test_demo_reports_all_required_mechanisms(run_demo):
     assert report["final_state"] == "awaiting_apply_approval"
 ```
 
-- [ ] **Step 2: Run the contract test to verify RED**
+- [x] **Step 2: Run the contract test to verify RED**
 
 Run: `python -m pytest tests/e2e/test_mechanism_demo.py -v`  
 Expected: FAIL because the script does not exist.
 
-- [ ] **Step 3: Implement deterministic JSON report generation**
+- [x] **Step 3: Implement deterministic JSON report generation**
 
 ```python
 def main() -> int:
@@ -1976,7 +2270,7 @@ if __name__ == "__main__":
 
 `run_mechanism_demo` first submits `src/calc.py` as a test proposal and captures the deterministic policy rejection; it then runs the scripted two-attempt loop and returns both strategies, feedback category, metric deltas, and final waiting-approval state.
 
-- [ ] **Step 4: Verify network independence and stable output**
+- [x] **Step 4: Verify network independence and stable output**
 
 Run twice with an environment mapping that removes `OPENAI_API_KEY`; assert byte-identical JSON and no outbound client factory call.
 
@@ -1996,7 +2290,7 @@ Expected: exit 0 and one JSON document containing `dangerous_action`, `feedback_
 Run: `python -m pytest tests/e2e/test_mechanism_demo.py -v`  
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit: `git add scripts/mechanism_demo.py tests/e2e/test_mechanism_demo.py && git commit -m "test: demonstrate deterministic harness mechanisms"`
 
@@ -2020,7 +2314,7 @@ Commit: `git add scripts/mechanism_demo.py tests/e2e/test_mechanism_demo.py && g
 - Consumes: all completed application and test entry points.
 - Produces: PyPI artifact, Docker image, platform-compatible CI, one-command test entry, and complete user/security documentation.
 
-- [ ] **Step 1: Write failing packaging and container smoke tests**
+- [x] **Step 1: Write failing packaging and container smoke tests**
 
 ```python
 def test_installed_package_exposes_cli():
@@ -2035,12 +2329,12 @@ def test_demo_health_endpoint(test_client):
     assert response.json() == {"status": "ok", "mode": "demo"}
 ```
 
-- [ ] **Step 2: Run packaging smoke tests to verify RED**
+- [x] **Step 2: Run packaging smoke tests to verify RED**
 
 Run: `python -m pytest tests/e2e/test_distribution.py -v`  
 Expected: FAIL until the module entry point and health route are configured.
 
-- [ ] **Step 3: Add reproducible package, Docker, and test commands**
+- [x] **Step 3: Add reproducible package, Docker, and test commands**
 
 ```dockerfile
 FROM python:3.12-slim AS runtime
@@ -2057,7 +2351,7 @@ CMD ["uvicorn", "testforge.web.app:create_demo_app", "--factory", "--host", "0.0
 
 Add `testforge-demo = "testforge.demo:main"` and include templates/static assets in the wheel. Define `python -m pytest` as the one-command test entry in README.
 
-- [ ] **Step 4: Add dual CI with an exact `unit-test` job**
+- [x] **Step 4: Add dual CI with an exact `unit-test` job**
 
 GitHub Actions runs the unit and fast mock-integration suites on Python 3.11 and 3.12; Ruff, mypy, wheel build, Docker build, and mechanism demo may run once on Python 3.12. `.gitlab-ci.yml` defines a job named exactly `unit-test` on Python 3.12 that runs `python -m pytest tests/unit tests/integration/test_mock_loop.py`, followed by package and container build jobs. Docker-dependent sandbox tests run only on a runner explicitly labeled/configured for Docker.
 
@@ -2082,7 +2376,7 @@ package:
     paths: [dist/]
 ```
 
-- [ ] **Step 5: Write README and license inventory**
+- [x] **Step 5: Write README and license inventory**
 
 README must contain: project introduction, architecture, installation from PyPI, CLI commands, local WebUI, public demo distinction, Docker commands, OS-keyring setup/status/update/clear, explicit `.env` risks, target-machine secret setup, directory structure, security boundaries, supported platform/architecture, Docker prerequisite, known limitations, one-command tests, mechanism demo, deployment architecture, and CI/CD. `LICENSES.md` lists every direct dependency and the vendored HTMX license.
 
@@ -2107,7 +2401,7 @@ README must contain: project introduction, architecture, installation from PyPI,
 ## Third-Party Licenses
 ```
 
-- [ ] **Step 6: Run full verification**
+- [x] **Step 6: Run full verification**
 
 Run: `python -m pytest`  
 Expected: all non-Docker-required tests PASS with zero failures.  
@@ -2124,7 +2418,7 @@ Expected: exit 0 with deterministic JSON.
 Run: `git grep -n -I -E "(sk-[A-Za-z0-9_-]{12,}|OPENAI_API_KEY=.+)" -- . ":(exclude)PLAN.md"`  
 Expected: no real-looking credential assignment or token.
 
-- [ ] **Step 7: Update evidence and commit**
+- [x] **Step 7: Update evidence and commit**
 
 Mark every completed task in `PLAN.md` with its commit hash. Append CI/build/test results and human interventions to `AGENT_LOG.md`.
 
@@ -2150,3 +2444,35 @@ For every task:
 4. A fresh code-quality reviewer checks correctness, tests, security, maintainability, and scope.
 5. The implementer fixes every Critical issue and reruns the task command plus the fast suite.
 6. Record implementer/reviewer identity, human edits, verification output, and commit hash in `AGENT_LOG.md` and `PLAN.md`.
+
+---
+
+## Task Completion Status (2026-08-08)
+
+Final verification: **297 passed, 3 skipped** (3 skips = approved Windows symlink cases).  
+Mechanism demo: **confirmed** — deterministic JSON, `dangerous_action.blocked=true`, `feedback_loop` 2-round, `quality_gate.passed=true`, `final_state=awaiting_apply_approval`.
+
+| Task | Status | Implementation Commit | Fix Commit(s) | Merge Commit | Reviewer |
+|---|---|---|---|---|---|
+| 1 — Package & Config | ✅ | `f617cf7` | — | `313de8f` | task01_reviewer |
+| 2 — Domain & State Machine | ✅ | `0003258` | `0d87095` | `29562a2` | task02_reviewer |
+| 3 — SQLite Repository | ✅ | `c3ad066` | `af5e6ee` | `2390774` | task03_reviewer |
+| 4 — Governance Policy | ✅ | `6a02027` | `2f811ac` | `38d41c9` | task04_reviewer |
+| 5 — Approvals & Write-back | ✅ | `ca20865` | `384bc77` | `e2697b5` | task05_reviewer |
+| 6 — LLM Protocol & Mock | ✅ | `3e1f6e3` | — | `42f1dba` | task06_reviewer |
+| 7 — Analyzer Parsers | ✅ | `e718e57` | `e850e36` | `c1d5f2e` | task07_reviewer |
+| 8 — Quality Gate & Feedback | ✅ | `f996735` | `1cf748d` | `b1a7428` | Hermes F1–F5 |
+| 9 — Structured Memory | ✅ | `527b734` | `e460905` | `aa62cdf` | self-review |
+| 10 — Docker Sandbox | ✅ | `8f4a1ed` | — | `729006d` | task10_reviewer |
+| 11 — Tool Dispatcher | ✅ | `2e9e7fd` | — | `8de8e93` | task11_reviewer |
+| 12 — Agent Engine | ✅ | `9369e9d` | `8d9271c` | `e6d7aa4` | task12_reviewer |
+| 13 — Credential Store | ✅ | `377e6d4` | — | `fd44d10` | task13_reviewer |
+| 14 — OpenAI Adapter | ✅ | `377e6d4` | — | `fd44d10` | task13_reviewer |
+| 15 — CLI | ✅ | `0a580dd` | — | `d975945` | task15_reviewer |
+| 16 — Local WebUI | ✅ | `89a896c` | — | `f3a803d` | task16_reviewer |
+| 17 — Public Demo Mode | ✅ | `89a896c` | — | `f3a803d` | task16_reviewer |
+| 18 — Mechanism Demo | ✅ | `89a896c` | — | `f3a803d` | task16_reviewer |
+| 19 — Distribution & CI | ✅ | `89a896c` | — | `f3a803d` | task16_reviewer |
+
+All Critical and Important review findings resolved. No remaining open issues.
+Integration branch: `feature/testforge-implementation` at `3f19da4`.

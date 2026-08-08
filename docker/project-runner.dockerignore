@@ -1,0 +1,10 @@
+.git
+.env
+.gitignore
+__pycache__
+*.pyc
+.venv
+venv
+*.key
+*.pem
+node_modules

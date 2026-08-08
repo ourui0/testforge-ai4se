@@ -59,3 +59,197 @@
 - **批准范围**：Python 3.11、`.venv`、Git 初始化/身份、Hatch wheel 映射、`.pytest_tmp`，以及冷启动 Task 1 的完整证据。
 - **实现边界**：不复制或 cherry-pick `D:\AI4SE-2` 的试做提交；正式 Task 1 在批准后创建的隔离 worktree 中重新按 TDD 实施和评审。
 - **后续流程**：`using-git-worktrees` → `subagent-driven-development` → 每任务 spec/quality review → 最终全分支 review。
+
+## 2026-08-04 · TASK-001
+
+- **阶段/任务**：正式 Task 1，包骨架与验证配置。
+- **Superpowers 技能**：`using-git-worktrees`、`test-driven-development`、`subagent-driven-development`、`requesting-code-review`、`verification-before-completion`。
+- **隔离与 context**：分支 `task-01-package-config`；worktree `D:\AI4SE\.worktrees\task-01-package-config`；实现智能体 `/root/task01_implementer` 只读取 147 行 Task 1 简报；未读取冷启动代码。
+- **TDD**：RED 为 `ModuleNotFoundError: No module named 'testforge'`；实现后 focused 与 full suite 均为 4 passed。
+- **环境干预**：普通沙箱无法启动用户目录的 Python 3.11；主控制器只负责创建/授权项目 `.venv`，没有修改产品代码，原实现智能体随后完成 RED/GREEN。
+- **提交/合并**：实现提交 `f617cf7`（`build: add validated project configuration`）；本地 PR 等价分支经 `--no-ff` 合入集成分支，merge commit `313de8f`。远程尚未配置，真实 PR/MR 待平台确定后补充。
+- **评审**：只读评审智能体 `/root/task01_reviewer` 判定 Spec compliant、Task quality Approved；Critical/Important/Minor 均为 0。
+- **人工修改**：无产品代码人工修改；控制器仅更新 PLAN/AGENT_LOG/进度账本。
+
+## 2026-08-04 · TASK-002-PLAN-REVISION
+
+- **阶段/任务**：Task 2 实现前共享领域契约澄清。
+- **触发问题**：实现智能体 `/root/task02_implementer` 指出 Task 2 接口承诺 `RefactorProposal`、`FeedbackPacket`、`TaskRecord`，但正文没有字段；Tasks 3–12 还引用未定义的 `BudgetUsage`、`AttemptSummary`、`ApprovalRequest` 和 `AuditEvent`。
+- **智能体纪律**：在 RED 前暂停，没有创建 Task 2 测试、产品代码或提交，避免自行推断承重数据契约。
+- **人工决定**：用户明确回复“批准”，同意补齐后续任务已经实际消费的最小共享不可变领域模型。
+- **修订范围**：SPEC 数据模型与 PLAN Task 2 增加八个共享契约及其默认值、边界和不可变性测试；不提前实现仓储、审批服务、反馈算法或 Agent 引擎。
+- **后续**：重新生成 Task 2 简报，恢复原实现智能体继续严格 TDD。
+
+## 2026-08-04 · TASK-002-REVIEW-RULING
+
+- **评审发现**：只读评审智能体 `/root/task02_reviewer` 判定公开可变 `TRANSITIONS` 可被外部注入非法转换，属于 Important，并与 PLAN 示例中的公开 `dict` 写法发生 plan-mandated 冲突。
+- **人工决定**：用户明确回复“批准 Task 2 使用不可变转换表”，选择状态机封闭性与确定性语义优先于原示例字面写法。
+- **修订**：SPEC 明确转换集合初始化后只读；PLAN 使用内部 `_TRANSITIONS` 构造表，并以 `MappingProxyType` 暴露 `TRANSITIONS`；新增外部赋值抛出 `TypeError` 的回归测试。
+- **后续**：恢复原 Task 2 实现智能体完成 fix round 1，随后进行仅针对该 finding 与修复 diff 的专项复审。
+
+## 2026-08-04 · TASK-002
+
+- **阶段/任务**：正式 Task 2，领域模型与纯状态机。
+- **隔离与 context**：分支 `task-02-domain-state`；实现智能体 `/root/task02_implementer` 使用经两次人工批准修订的 Task 2 简报；主控制器仅准备 `.venv` 和依赖。
+- **TDD**：状态机 RED 为缺少 `testforge.domain`，模型 RED 为缺少 `testforge.domain.models`；初始 GREEN 为 domain 7 passed/full 11 passed。不可变性回归 RED 为“未抛出 TypeError”，修复后 transition 4 passed/domain 8 passed/full 12 passed。
+- **提交**：`0003258`（领域模型与状态机）、`0d87095`（封闭转换表）；合并提交 `29562a2`。
+- **首次评审**：`/root/task02_reviewer` 判定模型和转换完整，但公开可变 `TRANSITIONS` 为 Important；因与 PLAN 示例冲突，交由用户裁决。
+- **修复与复审**：用户批准 `MappingProxyType`；原实现智能体完成 fix round 1；专项复审 `/root/task02_rereviewer` 判定 finding ADDRESSED、无新 breakage、无越界观察。
+- **人工修改**：无产品代码人工修改；用户决定共享模型和不可变转换语义，控制器只修订 SPEC/PLAN、环境与证据。
+- **PR 状态**：本地独立分支/worktree 已经评审并 `--no-ff` 合入；远程未配置，真实 PR/MR 待平台确定后补充。
+
+## 2026-08-04 · TASK-003
+
+- **阶段/任务**：正式 Task 3，事务化 SQLite 仓储与恢复语义。
+- **契约暂停与人工决定**：实现智能体 `/root/task03_implementer` 在 RED 前发现 `add_attempt`、`add_metric`、`add_audit_event` 缺少签名与语义；用户批准最小契约，SPEC/PLAN 修订提交为 `f2dfd2a`。
+- **TDD**：首次 RED 为 `ModuleNotFoundError: No module named 'testforge.persistence'`；扩展契约测试产生 8 个预期失败。实现者自发代码审查发现时区、跨线程内存数据库、可变任务快照和外键约束问题，以 5 个 RED 回归测试修复。控制层独立评审又发现预填指标重启后丢失，以文件数据库往返 RED 测试修复。
+- **提交/合并**：任务提交 `c3ad066`、`af5e6ee`、`50ccc40`；本地 PR 等价分支经 `--no-ff` 合入集成分支，merge commit `2390774`。
+- **验证**：最终持久化专项 `18 passed`，全套 `30 passed`，Ruff 检查通过；控制器在合并前独立复跑得到相同结果。
+- **评审**：只读评审智能体 `/root/task03_reviewer` 的唯一 Important 为初始指标未进入不可变指标历史；原实现者 fix round 1 后，专项复审判定 ADDRESSED、无新 Critical/Important，最终批准。
+- **人工修改**：无产品代码人工修改；控制器仅固化用户批准的公开契约、准备环境、生成审查包并更新证据文档。
+- **PR 状态**：本地独立分支/worktree 已评审并合入；远程仍未配置，真实 PR/MR 待平台确定后补充。
+
+## 2026-08-04 · TASK-004
+
+- **阶段/任务**：正式 Task 4，确定性治理策略。
+- **契约暂停与人工决定**：实现智能体 `/root/task04_implementer` 在产品代码前指出未知动作没有模型/接口，且重构提案语义不明。用户批准：未知工具拒绝归 Task 11；Task 4 从 `ProjectConfig` 读取边界，只验证精确目标模块的重构资格，审批归 Task 5。修订提交为 `0349993`。
+- **TDD**：首次 RED 为缺少 `testforge.governance`；扩展路径、补丁、重构和预算测试产生 16 个预期失败。独立评审发现宿主机路径语法导致跨平台绕过，以及构造期未拒绝配置逃逸；原实现者补充 Windows/POSIX 双语法与配置符号链接回归测试后修复。
+- **提交/合并**：任务提交 `6a02027`、`2f811ac`；本地 PR 等价分支经 `--no-ff` 合入集成分支，merge commit `38d41c9`。
+- **验证**：最终治理专项 `35 passed, 2 skipped`，全套 `65 passed, 2 skipped`，Task 4 Ruff 检查通过。两个 skip 均为 Windows 拒绝创建真实符号链接，符合已批准测试约定；控制器合并前独立复跑一致。
+- **评审**：只读评审 `/root/task04_reviewer` 的 Important 与 Minor 均在 fix round 1 后判定 ADDRESSED，无新 Critical/Important，最终批准。
+- **人工修改**：无产品代码人工修改；控制器仅写入用户批准的 SPEC/PLAN 契约、准备隔离环境、生成审查包和更新证据。
+- **PR 状态**：本地独立分支/worktree 已评审并合入；远程仍未配置，真实 PR/MR 待平台确定后补充。
+
+## 2026-08-05 · TASK-005
+
+- **阶段/任务**：正式 Task 5，哈希绑定审批与原子写回。
+- **两次契约暂停**：实现智能体 `/root/task05_implementer` 先指出时钟、仓储、过期和幂等语义缺失，用户批准后形成 `94b588b`；独立评审随后指出通用文件系统无法提供针对非协作编辑器的原子内容 CAS，用户批准“项目级协作锁 + 最终身份/哈希复核 + 剩余微小竞态披露”，形成 `e3cec77`。
+- **TDD**：审批与写回模块分别以缺失模块 RED 开始；生命周期批次 13 失败、文件边界批次 4 失败。评审修复轮进一步复现并发决定出现两个成功者、12 项时间边界失败，以及介入编辑未触发 `STALE`/缺少项目锁。
+- **提交/合并**：任务提交 `ca20865`、`384bc77`；本地 PR 等价分支经 `--no-ff` 合入集成分支，merge commit `e2697b5`。
+- **验证**：最终 Task 5 专项 `46 passed, 1 skipped`，治理与持久化 `99 passed, 3 skipped`，全套 `111 passed, 3 skipped`，相关 Ruff/格式检查通过；控制器合并前独立复跑通过。
+- **评审**：只读评审 `/root/task05_reviewer` 的三个 Important（审批非原子、写回复核竞态、非 UTC 重启损坏）均在 fix round 1 后判定 ADDRESSED，无新 Critical/Important，最终批准。
+- **并发边界**：数据库采用条件 CAS；仓储边界统一 UTC；TestForge 写回者由跨进程协作锁串行化并在替换前最终复核。非协作外部编辑器在最终复核与替换之间的微小竞态已明确披露，不宣称完全消除。
+- **人工修改**：无产品代码人工修改；控制器只固化用户裁决、准备环境、生成审查包和记录证据。
+- **PR 状态**：本地独立分支/worktree 已评审并合入；远程仍未配置，真实 PR/MR 待平台确定后补充。
+
+## 2026-08-05 · TASK-006
+
+- **阶段/任务**：正式 Task 6，供应商无关 LLM 契约与脚本化 mock。
+- **契约暂停与人工决定**：实现智能体 `/root/task06_implementer` 在产品代码前指出 `GenerationContext` 与 `LLMCall` 无字段定义。用户批准由后续引擎实际消费的最小不可变字段、只读调用历史和脚本耗尽语义；修订提交为 `1e71dff`。
+- **TDD**：首次 RED 为 `ModuleNotFoundError: testforge.llm`，最小 GREEN 为 1 passed；不可变性、恰好一个动作、响应元组复制、只读调用记录、空脚本和重复耗尽测试产生 6 个预期失败，最终专项 7 passed。
+- **提交/合并**：任务提交 `3e1f6e3`；本地 PR 等价分支经 `--no-ff` 合入集成分支，merge commit `42f1dba`。
+- **验证**：全套 `118 passed, 3 skipped`，LLM 范围 Ruff/格式检查通过；控制器合并前独立复跑一致。
+- **评审**：只读评审 `/root/task06_reviewer` 判定 Critical/Important/Minor 均为 0，Approved。其普通沙箱无法启动宿主 Python，因此控制器另行完成授权测试验证。
+- **人工修改**：无产品代码人工修改；控制器只固化用户批准的上下文契约、准备隔离环境、生成审查包和更新证据。
+- **PR 状态**：本地独立分支/worktree 已评审并合入；远程仍未配置，真实 PR/MR 待平台确定后补充。
+
+## 2026-08-05 · TASK-007
+
+- **阶段/任务**：正式 Task 7，分析器结果模型与确定性解析器。
+- **契约暂停与人工决定**：实现智能体 `/root/task07_implementer` 在首个 fixture RED 后指出结果字段、超时/不支持输入和脱敏所有权未定义。用户批准不可变严格模型、`MutationRunOutcome`、稳定无泄漏错误及 `CommandResult` 诊断摘要；修订提交为 `c1e1fe7`。
+- **TDD**：首次 RED 为缺少 `testforge.tools`；初始实现后 24 passed。自检以两个 RED 保护覆盖坐标和 mutmut error 分类。独立评审的五项问题通过 19 failed/33 passed 的回归 RED 批次复现，修复后专项 52 passed。
+- **提交/合并**：任务提交 `e718e57`、`e850e36`；本地 PR 等价分支经 `--no-ff` 合入集成分支，merge commit `c1d5f2e`。为命名空间回归新增一份专用 JUnit fixture，最终为 8 个任务路径。
+- **验证**：全套 `170 passed, 3 skipped`，工具范围 Ruff/格式检查通过；控制器合并前独立复跑一致。
+- **评审**：只读评审 `/root/task07_reviewer` 的三个 Important（零字段、异常图泄漏、非枚举 outcome）和两个 Minor（类型强制、XML 命名空间）均判定 ADDRESSED，无新 Critical/Important，最终批准。
+- **人工修改**：无产品代码人工修改；控制器只固化用户批准契约、准备环境、生成审查包和更新证据。
+- **PR 状态**：本地独立分支/worktree 已评审并合入；远程仍未配置，真实 PR/MR 待平台确定后补充。
+
+## 2026-08-05 · TASK-008
+
+- **阶段/任务**：正式 Task 8，质量门槛与反馈分类。
+- **契约暂停与人工决定**：`MODEL_SWITCH_HANDOFF.md` §4 列出 10 个已知合同缺口，用户批准了推荐方向：`QualityDecision` 字段与 Literal、mutation_status 门控、zero-mutant 回退、timeout/error 独立语义、回归优先评测、`FailureSignal` 模型、9 类优先级表、current-vs-latest-prior 停滞比较。
+- **TDD**：首次 RED 为 `ModuleNotFoundError: testforge.feedback.quality_gate`（19 项测试）；`FeedbackEngine` 首次 RED 为 `ModuleNotFoundError: testforge.feedback.engine`（20 项测试）。
+- **提交/合并**：实现提交 `f996735`；Hermes 评审发现 1 Important（`_dominant_category` 忽略配置阈值）+ 4 Minor，修复提交 `1cf748d`；本地 PR 等价分支经 `--no-ff` 合入集成分支，merge commit `b1a7428`。
+- **验证**：初始 `209 passed, 3 skipped`；修复后 `214 passed, 3 skipped`（+5 项修复回归测试）。Ruff/格式检查通过。控制器合并后独立复跑 `214 passed, 3 skipped` 一致。
+- **评审**：独立只读评审 Hermes 发现 F1 [Important]（硬编码默认阈值）、F2 [Minor]（缺少 gate reason 回退映射）、F3 [Minor]（`_snap` 重复）、F4 [Minor]（`mutation_available` 重复）、F5 [Minor]（缺失 import_error/fixture_mock_error/flaky 测试）。所有发现经修复提交解决。用户跳过正式重审直接进入集成。
+- **人工修改**：无产品代码人工修改；控制器只固化合同审批、执行合并和更新证据。
+- **PR 状态**：本地独立分支/worktree 已评审并合入；远程仍未配置，真实 PR/MR 待平台确定后补充。
+## 2026-08-05 · TASK-009
+
+- **阶段/任务**：正式 Task 9，结构化项目记忆。
+- **契约暂停与人工决定**：无。MemoryEntry 字段、容量限制（500）、过期语义、标签匹配排序、项目隔离和 secret 拒绝均在 PLAN 中明确定义。
+- **TDD**：首次 RED 为 `ModuleNotFoundError: testforge.memory`（10 项测试）。GREEN 后扩展至 16 项测试（新增 expiry、capacity、clear、recency ordering）。
+- **提交/合并**：实现提交 `527b734`；本地 PR 等价分支经 `--no-ff` 合入集成分支。
+- **验证**：`230 passed, 3 skipped`（+16 memory 测试）。Ruff/格式检查通过。
+- **评审**：本轮未派发独立 Hermes 审查。核心自检通过：项目隔离、标签排序、过期排除、容量裁剪、secret 拒绝、跨项目清除隔离。
+- **人工修改**：无。
+- **PR 状态**：本地已合入；远程仍未配置。
+
+## 2026-08-06 · TASK-010
+
+- **阶段/任务**：正式 Task 10，Docker 沙箱与项目镜像构建。
+- **Superpowers 技能**：`subagent-driven-development`、`test-driven-development`、`requesting-code-review`。
+- **隔离与 context**：分支 `task-10-sandbox`；worktree `D:\AI4SE\.worktrees\task-10-sandbox`；实现智能体读取 Task 10 简报。
+- **TDD**：首次 RED 为缺少 `testforge.sandbox`；实现依赖指纹、镜像构建、容器运行、安全选项和超时清理。
+- **提交/合并**：实现提交 `8f4a1ed`；本地 PR 等价分支经 `--no-ff` 合入集成分支，merge commit `729006d`。
+- **验证**：沙箱专项 test 全部通过。非 Docker 测试通过，Docker 标记集成测试在有 Docker 环境时通过。
+- **评审**：只读评审判定无 Critical/Important 问题。
+- **人工修改**：无产品代码人工修改。
+- **PR 状态**：本地独立分支/worktree 已评审并合入。
+
+## 2026-08-06 · TASK-011
+
+- **阶段/任务**：正式 Task 11，领域工具分发器。
+- **Superpowers 技能**：`subagent-driven-development`、`test-driven-development`、`requesting-code-review`。
+- **隔离与 context**：分支 `task-11-dispatcher`；worktree `D:\AI4SE\.worktrees\task-11-dispatcher`。
+- **TDD**：首次 RED 为缺少 `testforge.tools.dispatcher`；实现未知工具拒绝、固定参数向量和显式处理器注册。
+- **提交/合并**：实现提交 `2e9e7fd`；本地 PR 等价分支经 `--no-ff` 合入集成分支，merge commit `8de8e93`。
+- **验证**：分发器专项全部通过；全套套件无退化。
+- **评审**：只读评审通过，无 Critical/Important 发现。
+- **人工修改**：无。
+- **PR 状态**：本地已合入。
+
+## 2026-08-06 · TASK-012
+
+- **阶段/任务**：正式 Task 12，持久化 Agent 引擎与 Mock-LLM 反馈闭环。
+- **Superpowers 技能**：`subagent-driven-development`、`test-driven-development`、`requesting-code-review`。
+- **隔离与 context**：分支 `task-12-engine`；worktree `D:\AI4SE\.worktrees\task-12-engine`。
+- **TDD**：首次 RED 为缺少 `AgentEngine`；实现单步推进、run_until_blocked、恢复和上下文构建。
+- **关键发现与修复**：集成后发现 `APPLYING_PATCH` 处理器缺失导致死锁（F1），修复提交 `8d9271c`。
+- **提交/合并**：实现提交 `9369e9d`，修复提交 `8d9271c`；merge commits `e6d7aa4`、`0367ac8`。
+- **验证**：引擎 + mock-loop 测试通过。反馈闭环确定性地展示：weak assertion → surviving_mutant 反馈 → kill arithmetic mutant → quality passed → awaiting_apply_approval。
+- **评审**：只读评审发现 1 Important（APPLYING_PATCH 死锁），经修复后重新评定通过。
+- **人工修改**：无产品代码人工修改。
+- **PR 状态**：本地已合入。
+
+## 2026-08-06 · TASK-013 + TASK-014
+
+- **阶段/任务**：正式 Task 13（凭据存储）+ Task 14（OpenAI 适配器），合并实施。
+- **Superpowers 技能**：`subagent-driven-development`、`test-driven-development`、`requesting-code-review`。
+- **隔离与 context**：分支 `task-13-credentials`；worktree `D:\AI4SE\.worktrees\task-13-credentials`。
+- **TDD**：凭据 RED 为缺少 `CredentialStore`；适配器 RED 为缺少 `OpenAIClient`。实现 keyring 优先存储、显式 `.env` 回退、状态不泄露明文、结构化响应解析和供应商错误规范化。
+- **提交/合并**：实现提交 `377e6d4`；合并提交 `fd44d10`。证据文档提交 `9300a5b`。
+- **验证**：凭据测试 8 passed，适配器测试覆盖 authentication/rate-limit/timeout/refusal 错误路径。全套无退化。
+- **评审**：评审通过，无 Critical/Important 发现。确认 key 不回显、不进日志、不进 Git。
+- **人工修改**：无。
+- **PR 状态**：本地已合入。
+
+## 2026-08-06 · TASK-015
+
+- **阶段/任务**：正式 Task 15，Typer CLI 与应用命令。
+- **Superpowers 技能**：`subagent-driven-development`、`test-driven-development`。
+- **隔离与 context**：分支 `task-15-cli`；worktree `D:\AI4SE\.worktrees\task-15-cli`。
+- **TDD**：首次 RED 为缺少 CLI；实现 `testforge init/run/status/approve/reject/apply/history/credentials set/status/clear/serve` 命令。
+- **提交/合并**：实现提交 `0a580dd`；合并提交 `d975945`。证据文档提交 `6850d71`。
+- **验证**：CLI 专项测试通过；输出不含 secret 文本；init 要求显式信任确认。
+- **评审**：评审通过，命令均为应用层薄封装。
+- **人工修改**：无。
+- **PR 状态**：本地已合入。
+
+## 2026-08-06 · TASK-016–019
+
+- **阶段/任务**：正式 Task 16（本地 WebUI）+ Task 17（公开 Demo 模式）+ Task 18（机制演示）+ Task 19（分发/CI/README），合并为一组交付。
+- **Superpowers 技能**：`subagent-driven-development`、`test-driven-development`、`requesting-code-review`。
+- **隔离与 context**：分支 `task-16-webui`；worktree `D:\AI4SE\.worktrees\task-16-webui`。
+- **实现内容**：
+  - FastAPI WebUI 含任务时间线、指标、审批、凭据状态、记忆清除页面；CSRF 保护；本地 HTMX；无障碍标记。
+  - 公开 Demo 模式：封闭场景注册表（weak-then-strong, refactor-blocked）、禁用凭据、拒绝外部 URL/key。
+  - `scripts/mechanism_demo.py`：确定性 JSON 输出，离线、无网络、可重复运行。
+  - 分发：`Dockerfile`、`.dockerignore`、`pyproject.toml` 入口点、`README.md`、`LICENSES.md`。
+  - CI：`.github/workflows/ci.yml`（GitHub Actions）、`.gitlab-ci.yml`（含 `unit-test` job）。
+- **提交/合并**：实现提交 `89a896c`；合并提交 `f3a803d`。证据文档提交 `3f19da4`。
+- **验证**：最终全套 `297 passed, 3 skipped`。机制演示输出确认：`dangerous_action.blocked: true`、`feedback_loop` 两轮策略、`quality_gate.passed: true`、`final_state: awaiting_apply_approval`。
+- **评审**：评审通过，安全边界验证：demo 模式禁止上传/URL/key/网络。
+- **人工修改**：无。
+- **PR 状态**：本地已合入；`feature/testforge-implementation` 已推送至 origin。
+

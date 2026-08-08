@@ -1,0 +1,12 @@
+{
+  "responses": [
+    {"test": {"path": "tests/test_calc.py", "content": "def test_add(): assert add(1,2)==3", "strategy": "weak assertion"}},
+    {"test": {"path": "tests/test_calc.py", "content": "def test_add(): assert add(1,2)==3; assert add(0,0)==0", "strategy": "kill arithmetic mutant"}}
+  ],
+  "tool_results": [
+    {"exit_code": 0, "stdout": "", "stderr": ""},
+    {"exit_code": 0, "stdout": "", "stderr": ""},
+    {"exit_code": 0, "stdout": "", "stderr": ""},
+    {"exit_code": 0, "stdout": "", "stderr": ""}
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "meta": {
+    "format": 3,
+    "version": "7.10.0",
+    "branch_coverage": true,
+    "show_contexts": false
+  },
+  "files": {
+    "src/calc.py": {
+      "executed_lines": [1, 2, 3, 5],
+      "summary": {
+        "covered_lines": 4,
+        "num_statements": 5,
+        "percent_covered": 75.0,
+        "percent_covered_display": "75",
+        "missing_lines": 1,
+        "excluded_lines": 0,
+        "num_branches": 2,
+        "num_partial_branches": 1,
+        "covered_branches": 1,
+        "missing_branches": 1
+      },
+      "missing_lines": [4],
+      "excluded_lines": [],
+      "executed_branches": [[2, 3]],
+      "missing_branches": [[2, 5]]
+    }
+  }
+}
