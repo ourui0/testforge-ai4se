@@ -174,3 +174,82 @@
 - **评审**：本轮未派发独立 Hermes 审查。核心自检通过：项目隔离、标签排序、过期排除、容量裁剪、secret 拒绝、跨项目清除隔离。
 - **人工修改**：无。
 - **PR 状态**：本地已合入；远程仍未配置。
+
+## 2026-08-06 · TASK-010
+
+- **阶段/任务**：正式 Task 10，Docker 沙箱与项目镜像构建。
+- **Superpowers 技能**：`subagent-driven-development`、`test-driven-development`、`requesting-code-review`。
+- **隔离与 context**：分支 `task-10-sandbox`；worktree `D:\AI4SE\.worktrees\task-10-sandbox`；实现智能体读取 Task 10 简报。
+- **TDD**：首次 RED 为缺少 `testforge.sandbox`；实现依赖指纹、镜像构建、容器运行、安全选项和超时清理。
+- **提交/合并**：实现提交 `8f4a1ed`；本地 PR 等价分支经 `--no-ff` 合入集成分支，merge commit `729006d`。
+- **验证**：沙箱专项 test 全部通过。非 Docker 测试通过，Docker 标记集成测试在有 Docker 环境时通过。
+- **评审**：只读评审判定无 Critical/Important 问题。
+- **人工修改**：无产品代码人工修改。
+- **PR 状态**：本地独立分支/worktree 已评审并合入。
+
+## 2026-08-06 · TASK-011
+
+- **阶段/任务**：正式 Task 11，领域工具分发器。
+- **Superpowers 技能**：`subagent-driven-development`、`test-driven-development`、`requesting-code-review`。
+- **隔离与 context**：分支 `task-11-dispatcher`；worktree `D:\AI4SE\.worktrees\task-11-dispatcher`。
+- **TDD**：首次 RED 为缺少 `testforge.tools.dispatcher`；实现未知工具拒绝、固定参数向量和显式处理器注册。
+- **提交/合并**：实现提交 `2e9e7fd`；本地 PR 等价分支经 `--no-ff` 合入集成分支，merge commit `8de8e93`。
+- **验证**：分发器专项全部通过；全套套件无退化。
+- **评审**：只读评审通过，无 Critical/Important 发现。
+- **人工修改**：无。
+- **PR 状态**：本地已合入。
+
+## 2026-08-06 · TASK-012
+
+- **阶段/任务**：正式 Task 12，持久化 Agent 引擎与 Mock-LLM 反馈闭环。
+- **Superpowers 技能**：`subagent-driven-development`、`test-driven-development`、`requesting-code-review`。
+- **隔离与 context**：分支 `task-12-engine`；worktree `D:\AI4SE\.worktrees\task-12-engine`。
+- **TDD**：首次 RED 为缺少 `AgentEngine`；实现单步推进、run_until_blocked、恢复和上下文构建。
+- **关键发现与修复**：集成后发现 `APPLYING_PATCH` 处理器缺失导致死锁（F1），修复提交 `8d9271c`。
+- **提交/合并**：实现提交 `9369e9d`，修复提交 `8d9271c`；merge commits `e6d7aa4`、`0367ac8`。
+- **验证**：引擎 + mock-loop 测试通过。反馈闭环确定性地展示：weak assertion → surviving_mutant 反馈 → kill arithmetic mutant → quality passed → awaiting_apply_approval。
+- **评审**：只读评审发现 1 Important（APPLYING_PATCH 死锁），经修复后重新评定通过。
+- **人工修改**：无产品代码人工修改。
+- **PR 状态**：本地已合入。
+
+## 2026-08-06 · TASK-013 + TASK-014
+
+- **阶段/任务**：正式 Task 13（凭据存储）+ Task 14（OpenAI 适配器），合并实施。
+- **Superpowers 技能**：`subagent-driven-development`、`test-driven-development`、`requesting-code-review`。
+- **隔离与 context**：分支 `task-13-credentials`；worktree `D:\AI4SE\.worktrees\task-13-credentials`。
+- **TDD**：凭据 RED 为缺少 `CredentialStore`；适配器 RED 为缺少 `OpenAIClient`。实现 keyring 优先存储、显式 `.env` 回退、状态不泄露明文、结构化响应解析和供应商错误规范化。
+- **提交/合并**：实现提交 `377e6d4`；合并提交 `fd44d10`。证据文档提交 `9300a5b`。
+- **验证**：凭据测试 8 passed，适配器测试覆盖 authentication/rate-limit/timeout/refusal 错误路径。全套无退化。
+- **评审**：评审通过，无 Critical/Important 发现。确认 key 不回显、不进日志、不进 Git。
+- **人工修改**：无。
+- **PR 状态**：本地已合入。
+
+## 2026-08-06 · TASK-015
+
+- **阶段/任务**：正式 Task 15，Typer CLI 与应用命令。
+- **Superpowers 技能**：`subagent-driven-development`、`test-driven-development`。
+- **隔离与 context**：分支 `task-15-cli`；worktree `D:\AI4SE\.worktrees\task-15-cli`。
+- **TDD**：首次 RED 为缺少 CLI；实现 `testforge init/run/status/approve/reject/apply/history/credentials set/status/clear/serve` 命令。
+- **提交/合并**：实现提交 `0a580dd`；合并提交 `d975945`。证据文档提交 `6850d71`。
+- **验证**：CLI 专项测试通过；输出不含 secret 文本；init 要求显式信任确认。
+- **评审**：评审通过，命令均为应用层薄封装。
+- **人工修改**：无。
+- **PR 状态**：本地已合入。
+
+## 2026-08-06 · TASK-016–019
+
+- **阶段/任务**：正式 Task 16（本地 WebUI）+ Task 17（公开 Demo 模式）+ Task 18（机制演示）+ Task 19（分发/CI/README），合并为一组交付。
+- **Superpowers 技能**：`subagent-driven-development`、`test-driven-development`、`requesting-code-review`。
+- **隔离与 context**：分支 `task-16-webui`；worktree `D:\AI4SE\.worktrees\task-16-webui`。
+- **实现内容**：
+  - FastAPI WebUI 含任务时间线、指标、审批、凭据状态、记忆清除页面；CSRF 保护；本地 HTMX；无障碍标记。
+  - 公开 Demo 模式：封闭场景注册表（weak-then-strong, refactor-blocked）、禁用凭据、拒绝外部 URL/key。
+  - `scripts/mechanism_demo.py`：确定性 JSON 输出，离线、无网络、可重复运行。
+  - 分发：`Dockerfile`、`.dockerignore`、`pyproject.toml` 入口点、`README.md`、`LICENSES.md`。
+  - CI：`.github/workflows/ci.yml`（GitHub Actions）、`.gitlab-ci.yml`（含 `unit-test` job）。
+- **提交/合并**：实现提交 `89a896c`；合并提交 `f3a803d`。证据文档提交 `3f19da4`。
+- **验证**：最终全套 `297 passed, 3 skipped`。机制演示输出确认：`dangerous_action.blocked: true`、`feedback_loop` 两轮策略、`quality_gate.passed: true`、`final_state: awaiting_apply_approval`。
+- **评审**：评审通过，安全边界验证：demo 模式禁止上传/URL/key/网络。
+- **人工修改**：无。
+- **PR 状态**：本地已合入；`feature/testforge-implementation` 已推送至 origin。
+

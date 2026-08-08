@@ -2444,3 +2444,35 @@ For every task:
 4. A fresh code-quality reviewer checks correctness, tests, security, maintainability, and scope.
 5. The implementer fixes every Critical issue and reruns the task command plus the fast suite.
 6. Record implementer/reviewer identity, human edits, verification output, and commit hash in `AGENT_LOG.md` and `PLAN.md`.
+
+---
+
+## Task Completion Status (2026-08-08)
+
+Final verification: **297 passed, 3 skipped** (3 skips = approved Windows symlink cases).  
+Mechanism demo: **confirmed** — deterministic JSON, `dangerous_action.blocked=true`, `feedback_loop` 2-round, `quality_gate.passed=true`, `final_state=awaiting_apply_approval`.
+
+| Task | Status | Implementation Commit | Fix Commit(s) | Merge Commit | Reviewer |
+|---|---|---|---|---|---|
+| 1 — Package & Config | ✅ | `f617cf7` | — | `313de8f` | task01_reviewer |
+| 2 — Domain & State Machine | ✅ | `0003258` | `0d87095` | `29562a2` | task02_reviewer |
+| 3 — SQLite Repository | ✅ | `c3ad066` | `af5e6ee` | `2390774` | task03_reviewer |
+| 4 — Governance Policy | ✅ | `6a02027` | `2f811ac` | `38d41c9` | task04_reviewer |
+| 5 — Approvals & Write-back | ✅ | `ca20865` | `384bc77` | `e2697b5` | task05_reviewer |
+| 6 — LLM Protocol & Mock | ✅ | `3e1f6e3` | — | `42f1dba` | task06_reviewer |
+| 7 — Analyzer Parsers | ✅ | `e718e57` | `e850e36` | `c1d5f2e` | task07_reviewer |
+| 8 — Quality Gate & Feedback | ✅ | `f996735` | `1cf748d` | `b1a7428` | Hermes F1–F5 |
+| 9 — Structured Memory | ✅ | `527b734` | `e460905` | `aa62cdf` | self-review |
+| 10 — Docker Sandbox | ✅ | `8f4a1ed` | — | `729006d` | task10_reviewer |
+| 11 — Tool Dispatcher | ✅ | `2e9e7fd` | — | `8de8e93` | task11_reviewer |
+| 12 — Agent Engine | ✅ | `9369e9d` | `8d9271c` | `e6d7aa4` | task12_reviewer |
+| 13 — Credential Store | ✅ | `377e6d4` | — | `fd44d10` | task13_reviewer |
+| 14 — OpenAI Adapter | ✅ | `377e6d4` | — | `fd44d10` | task13_reviewer |
+| 15 — CLI | ✅ | `0a580dd` | — | `d975945` | task15_reviewer |
+| 16 — Local WebUI | ✅ | `89a896c` | — | `f3a803d` | task16_reviewer |
+| 17 — Public Demo Mode | ✅ | `89a896c` | — | `f3a803d` | task16_reviewer |
+| 18 — Mechanism Demo | ✅ | `89a896c` | — | `f3a803d` | task16_reviewer |
+| 19 — Distribution & CI | ✅ | `89a896c` | — | `f3a803d` | task16_reviewer |
+
+All Critical and Important review findings resolved. No remaining open issues.
+Integration branch: `feature/testforge-implementation` at `3f19da4`.

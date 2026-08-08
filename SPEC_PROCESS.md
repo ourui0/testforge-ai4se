@@ -1,6 +1,6 @@
 # TestForge 规约过程记录
 
-> 当前记录范围：Superpowers brainstorming、设计与计划批准，以及 Claude Code 陌生智能体冷启动。Task 1 复跑证据与最终人工批准均已完整记录，正式实现已获授权。
+> 当前记录范围：Superpowers brainstorming、设计与计划批准、Claude Code 陌生智能体冷启动、全部 19 个任务实现与评审过程。项目代码已完成，`297 passed, 3 skipped`。
 
 ## 1. Brainstorming 起点
 
@@ -108,3 +108,60 @@
 - **批准范围**：Python 3.11 最低版本、`.venv` 解释器规则、冷启动 Git 初始化与本地身份规则、Hatch wheel 包映射、项目内 pytest basetemp，以及 Task 1 的 RED/GREEN/diff/commit 证据。
 - **所有权边界**：`D:\AI4SE-2` 的试做代码不直接合入正式仓库；正式实现从批准后的主仓库提交创建隔离 worktree，按每任务新 subagent、TDD 和两阶段评审执行。
 - **门槛结论**：陌生智能体冷启动门槛关闭，允许正式实现。
+
+## 9. 正式实现过程
+
+### 9.1 总体执行
+
+冷启动批准后，使用 `using-git-worktrees` 为每个任务创建隔离 worktree 和分支，并按 `subagent-driven-development` 流程每任务分派独立实施智能体（Claude）和独立评审智能体。所有实现遵循严格 TDD（先 RED，再最小 GREEN，再重构）。
+
+### 9.2 契约暂停模式
+
+实现过程中反复出现以下模式：实施智能体在 RED 前识别出 PLAN 中未定义的公共契约（缺少字段、签名、语义），主动暂停等待人工批准。这种"不确定就暂停"的纪律避免了智能体凭空猜测关键数据契约：
+
+| 任务 | 暂停原因 | 人工裁决 |
+|---|---|---|
+| Task 2 | 共享领域模型无字段定义 | 补齐 8 个最小不可变契约 |
+| Task 3 | 仓储方法缺少签名和语义 | 明确附加/事件/不可变历史 |
+| Task 4 | 未知动作模型未定义 | 归入 Task 11；Task 4 只做路径/补丁/预算 |
+| Task 5 | 时钟、过期、幂等语义缺失 | 注入 Clock，UTC，CAS 决策 |
+| Task 6 | GenerationContext/LLMCall 无字段 | 最小不可变字段 + 只读调用历史 |
+| Task 7 | 结果字段、超时/不支持输入未定义 | MutationRunOutcome + 安全诊断 |
+| Task 8 | 10 个质量/停滞/分类契约缺口 | MODEL_SWITCH_HANDOFF 批准的完整方案 |
+
+### 9.3 评审发现与修复
+
+每个任务均经只读评审智能体验证。关键发现包括：
+- Task 2: 公开可变 TRANSITIONS 表可被外部注入（→ MappingProxyType）
+- Task 4: 宿主机路径语法跨平台绕过（→ Windows/POSIX 双语法）
+- Task 5: 审批非原子、写回复核竞态、非 UTC 时间戳（→ CAS + 协作锁 + UTC）
+- Task 7: 零字段、异常图泄露（→ 严格类型 + 诊断脱敏）
+- Task 8: 硬编码默认阈值忽略配置（→ 使用运行时 QualityThreshold）
+- Task 12: APPLYING_PATCH 处理器缺失导致死锁（→ 补充处理器）
+
+所有 Critical/Important 发现均在 fix round 内解决并通过专项复审。
+
+### 9.4 Tasks 13–19 合并实施
+
+由于余下任务高度内聚（凭据→适配器→CLI→WebUI→Demo→分发→CI），Tasks 13–19 分为三个实施组：
+- **组 A** (Tasks 13+14): 凭据存储 + OpenAI 适配器
+- **组 B** (Task 15): CLI
+- **组 C** (Tasks 16–19): WebUI + Demo + 机制演示 + 分发 + CI + README
+
+每组由单一实施智能体完成，经独立评审后合入。
+
+### 9.5 最终验证
+
+- 全套测试：`297 passed, 3 skipped`（3 个 skip 为已批准的 Windows 符号链接权限问题）
+- 机制演示：确定性 JSON 输出，确认 `dangerous_action.blocked=true`，反馈闭环两轮变换（weak assertion → kill arithmetic mutant），`quality_gate.passed=true`
+- 凭据扫描：无真实 key 或 secret 泄露
+- 分发产物：Dockerfile、.gitlab-ci.yml、.github/workflows/ci.yml、pyproject.toml 入口点
+
+### 9.6 对 Superpowers 流程的观察
+
+- **契约暂停**是流程中最有价值的机制：智能体在不确定处停止并请求裁决，比自行猜测产生更正确的设计。
+- **隔离 worktree**有效防止任务间交叉污染，每个任务有独立的 git 历史。
+- **TDD 强制**在 AI 协作中是放大器——实施智能体在 SPEC/PLAN 清晰时能高效地走 RED→GREEN 流程。
+- **评审发现**的质量与评审智能体获得的上下文量高度相关：仅给 diff 时偏重代码风格；给完整 SPEC+PLAN 时能发现更深层的语义问题。
+- 部分实施智能体自发完成了自检修复（如 Task 3 的时区和外键问题），表明 subagent 在明确契约下可表现出一定的工程判断力。
+- SDD progress ledger 仅记录到 Task 9，其余依靠 AGENT_LOG 和 git history，过程追溯性在后半段有所下降。
