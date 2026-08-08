@@ -1,6 +1,6 @@
+from collections.abc import Mapping
 from enum import StrEnum
 from types import MappingProxyType
-from typing import Mapping
 
 from testforge.domain.errors import InvalidTransition
 

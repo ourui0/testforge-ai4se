@@ -1,7 +1,7 @@
 """Tests for demo mode — no external code, no credentials, closed scenarios."""
 
-from fastapi.testclient import TestClient
 import pytest
+from fastapi.testclient import TestClient
 
 from testforge.web.app import create_app
 

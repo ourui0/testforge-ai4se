@@ -8,7 +8,6 @@ from fastapi.testclient import TestClient
 
 from testforge.web.app import create_app
 
-
 # ── fake application ─────────────────────────────────────────────────
 
 class FakeApp:

@@ -1,8 +1,7 @@
-from testforge.config import ProjectConfig
-
 import pytest
 from pydantic import ValidationError
-from testforge.config import TaskBudget
+
+from testforge.config import ProjectConfig, TaskBudget
 
 
 def test_project_config_has_spec_defaults(tmp_path):

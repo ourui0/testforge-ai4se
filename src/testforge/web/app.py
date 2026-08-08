@@ -1,12 +1,13 @@
 """FastAPI application factory and routes for local TestForge WebUI."""
 
 from pathlib import Path
-from typing import Literal
 from uuid import UUID
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+
+from testforge.domain.errors import InputError
 
 _TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -30,7 +31,7 @@ def create_app(application: object, demo_mode: bool = False) -> FastAPI:
     def task_detail(task_id: str) -> HTMLResponse:
         try:
             view = application.get_task_view(UUID(task_id))
-        except Exception:
+        except (InputError, ValueError):
             return HTMLResponse(
                 content=_page("Error", "<h1>Task not found</h1>"),
                 status_code=404,
@@ -47,7 +48,7 @@ def create_app(application: object, demo_mode: bool = False) -> FastAPI:
     def approvals_list() -> str:
         try:
             items = application.get_pending_approvals()
-        except Exception:
+        except (InputError, ValueError, LookupError):
             items = []
         rows = "".join(
             f"<li>{a.id} — {a.kind} "

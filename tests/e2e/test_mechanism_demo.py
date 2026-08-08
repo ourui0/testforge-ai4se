@@ -1,10 +1,6 @@
 """E2E test for mechanism demo — deterministic, offline, byte-stable."""
 
-import json
-import sys
-from io import StringIO
 
-import pytest
 
 from scripts.mechanism_demo import main, run_mechanism_demo
 
