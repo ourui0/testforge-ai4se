@@ -84,7 +84,7 @@ docker run -p 8000:8000 testforge:local
 
 ```bash
 # One-command test suite:
-python -m pytest tests/unit tests/integration/test_mock_loop.py tests/e2e -m "not docker"
+python -m pytest tests/unit tests/e2e -m "not docker"
 
 # Deterministic mechanism demonstration:
 python scripts/mechanism_demo.py

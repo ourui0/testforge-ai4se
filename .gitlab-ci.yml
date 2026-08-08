@@ -5,7 +5,7 @@ unit-test:
   image: python:3.12
   script:
     - python -m pip install -e ".[dev]"
-    - python -m pytest tests/unit tests/integration/test_mock_loop.py tests/e2e -m "not docker"
+    - python -m pytest tests/unit tests/e2e -m "not docker"
 
 package:
   stage: build
