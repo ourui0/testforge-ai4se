@@ -1,0 +1,12 @@
+{
+  // 学号
+  "id": "241870008",
+  // 姓名
+  "name": "欧睿",
+  // 仓库托管链接
+  "repo_url": "https://github.com/ourui0/testforge-ai4se",
+  // 是否部署
+  "is_deployed": true,
+  // 部署或发布链接
+  "deploy_release_url": "https://testforge-demo.onrender.com/"
+}
